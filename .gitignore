@@ -1,0 +1,151 @@
+# ==========================
+# 系统/编辑器自动生成文件
+# ==========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE 配置文件（所有开发者本地配置，不提交）
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+!.vscode/extensions.json  # 如需共享插件推荐，可保留这一行
+*.swp
+*.swo
+*~
+
+# ==========================
+# 前端通用忽略
+# ==========================
+# 依赖包
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bower_components/
+
+# 构建产物
+dist/
+build/
+output/
+*.log
+
+# 环境变量（敏感信息）
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 测试/缓存
+coverage/
+.nyc_output/
+.temp/
+.cache/
+
+# Vue 项目
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# React 项目
+npm-debug.log*
+
+# ==========================
+# Node.js 后端忽略
+# ==========================
+node_modules/
+.env
+.env.*
+!.env.example
+logs/
+*.log
+tmp/
+temp/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ==========================
+# Java / SpringBoot 后端忽略
+# ==========================
+# 编译产物
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# IDE
+.apt_generated
+.factorypath
+.springBeans
+.sts4-cache
+
+# Maven/Gradle
+mvnw
+mvnw.cmd
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# ==========================
+# Python 后端忽略
+# ==========================
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# 分发文件
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 环境变量
+.env
+.venv
+env/
+ENV/
+
+# ==========================
+# 通用敏感文件
+# ==========================
+*.key
+*.pem
+*.crt
+*.cer
+*.rsa
+local.properties
+config/local/
