@@ -6,9 +6,9 @@ spring:
         druid:
             # 主库数据源
             master:
-                url: jdbc:oracle:thin:@127.0.0.1:1521/orcl
-                username: root
-                password: password
+                url: jdbc:oracle:thin:@128.128.9.3:1521:ora11
+                username: ZXH
+                password: ekTc4iBS0D
             # 从库数据源
             slave:
                 # 从数据源开关/默认关闭
