@@ -5,7 +5,8 @@ const DEFAULT_WIDGETS = [
   { id: 'approval', title: '待办审批', x: 0, y: 0, w: 6, h: 4 },
   { id: 'customer-stats', title: '客户统计', x: 6, y: 0, w: 6, h: 2 },
   { id: 'opportunity-funnel', title: '商机漏斗', x: 0, y: 4, w: 6, h: 4 },
-  { id: 'unread-messages', title: '未读消息', x: 6, y: 2, w: 6, h: 3 }
+  { id: 'unread-messages', title: '未读消息', x: 6, y: 2, w: 6, h: 3 },
+  { id: 'expiring-contracts', title: '合同到期提醒', x: 6, y: 5, w: 6, h: 3 }
 ]
 
 const useCrmWorkbenchStore = defineStore('crmWorkbench', {
@@ -36,7 +37,7 @@ const useCrmWorkbenchStore = defineStore('crmWorkbench', {
         x: 0,
         y: 0,
         w: 6,
-        h: meta.id === 'quick-actions' ? 2 : 3
+        h: meta.id === 'quick-actions' ? 2 : meta.id === 'expiring-contracts' ? 4 : 3
       })
       return true
     },

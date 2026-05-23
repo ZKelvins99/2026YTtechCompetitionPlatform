@@ -25,7 +25,7 @@
       <div class="panel chart-panel" ref="pieChartRef"></div>
     </div>
 
-    <div class="panel log-panel">
+    <div class="panel log-panel" @mouseenter="paused = true" @mouseleave="paused = false">
       <div class="panel-title">最近操作日志（实时滚动）</div>
       <div class="log-scroll-wrap" ref="logScrollRef">
         <el-table :data="logStats.recentLogs" size="small" :show-header="true" class="dark-table">
@@ -66,7 +66,8 @@ const systemStatus = ref({})
 const logStats = ref({ recentLogs: [], hourlyStats: [], topUsers: [], moduleStats: [] })
 
 let cpuChart, memChart, barChart, pieChart, errorChart
-let scrollTimer = null
+let rafId = null
+let paused = false
 
 const trendClass = computed(() => {
   const t = logStats.value.todayTrend || 0
@@ -145,14 +146,30 @@ function initCharts() {
   errorChart = echarts.init(errorChartRef.value, 'dark')
 }
 
+let rafId = null
+let paused = false
+
 function startLogScroll() {
-  scrollTimer = setInterval(() => {
-    const wrap = logScrollRef.value
-    if (wrap) {
-      wrap.scrollTop += 1
-      if (wrap.scrollTop >= wrap.scrollHeight - wrap.clientHeight) wrap.scrollTop = 0
+  const wrap = logScrollRef.value
+  if (!wrap) return
+
+  function step() {
+    if (!paused) {
+      wrap.scrollTop += 0.8
+      if (wrap.scrollTop >= wrap.scrollHeight - wrap.clientHeight) {
+        wrap.scrollTop = 0
+      }
     }
-  }, 80)
+    rafId = requestAnimationFrame(step)
+  }
+  rafId = requestAnimationFrame(step)
+}
+
+function stopLogScroll() {
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
 }
 
 useIntervalFn(loadData, 10000)
@@ -167,7 +184,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  clearInterval(scrollTimer)
+  stopLogScroll()
   cpuChart?.dispose(); memChart?.dispose(); barChart?.dispose(); pieChart?.dispose(); errorChart?.dispose()
 })
 </script>

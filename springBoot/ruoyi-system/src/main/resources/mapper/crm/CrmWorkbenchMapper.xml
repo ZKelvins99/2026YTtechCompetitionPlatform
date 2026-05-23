@@ -53,4 +53,15 @@
         group by s.stage_name, s.sort_order
         order by s.sort_order
     </select>
+
+    <select id="selectExpiringContracts" resultType="map">
+        select c.id as "id", c.contract_no as "contractNo", c.contract_name as "contractName",
+               c.contract_amount as "amount", c.end_date as "endDate",
+               round(c.end_date - sysdate) as "remainingDays"
+        from crm_contract c
+        where c.status_id = (select id from crm_contract_status where status_code = 'EFFECTIVE')
+          and c.end_date between sysdate and sysdate + 30
+          and rownum &lt;= 10
+        order by c.end_date asc
+    </select>
 </mapper>

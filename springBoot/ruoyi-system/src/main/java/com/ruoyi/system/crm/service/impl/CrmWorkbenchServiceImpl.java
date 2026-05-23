@@ -72,6 +72,7 @@ public class CrmWorkbenchServiceImpl implements ICrmWorkbenchService
         list.add(meta("opportunity-funnel", "商机漏斗", "各阶段商机数量分布"));
         list.add(meta("unread-messages", "未读消息", "最近5条未读CRM消息"));
         list.add(meta("quick-actions", "快捷操作", "常用业务快捷入口"));
+        list.add(meta("expiring-contracts", "合同到期提醒", "近30天内到期的合同列表"));
         return list;
     }
 
@@ -102,6 +103,8 @@ public class CrmWorkbenchServiceImpl implements ICrmWorkbenchService
                 actions.add(action("发送消息", "/crm/message/send", "crm:message:send"));
                 actions.add(action("数据大屏", "/crm/dashboard", "crm:dashboard:view"));
                 return actions;
+            case "expiring-contracts":
+                return normalizeList(crmWorkbenchMapper.selectExpiringContracts());
             default:
                 return new HashMap<>();
         }
@@ -132,6 +135,7 @@ public class CrmWorkbenchServiceImpl implements ICrmWorkbenchService
         widgets.add(widget("customer-stats", "客户统计", 6, 0, 6, 2));
         widgets.add(widget("opportunity-funnel", "商机漏斗", 0, 4, 6, 4));
         widgets.add(widget("unread-messages", "未读消息", 6, 2, 6, 3));
+        widgets.add(widget("expiring-contracts", "合同到期提醒", 6, 5, 6, 3));
         return widgets;
     }
 

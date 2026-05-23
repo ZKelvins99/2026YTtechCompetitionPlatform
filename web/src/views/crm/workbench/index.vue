@@ -30,6 +30,7 @@
             <OpportunityFunnelWidget v-else-if="element.id === 'opportunity-funnel'" />
             <UnreadMessagesWidget v-else-if="element.id === 'unread-messages'" />
             <QuickActionsWidget v-else-if="element.id === 'quick-actions'" />
+            <ExpiringContractsWidget v-else-if="element.id === 'expiring-contracts'" />
           </div>
         </div>
       </template>
@@ -53,6 +54,7 @@ import CustomerStatsWidget from './components/CustomerStatsWidget.vue'
 import OpportunityFunnelWidget from './components/OpportunityFunnelWidget.vue'
 import UnreadMessagesWidget from './components/UnreadMessagesWidget.vue'
 import QuickActionsWidget from './components/QuickActionsWidget.vue'
+import ExpiringContractsWidget from './components/ExpiringContractsWidget.vue'
 
 const { proxy } = getCurrentInstance()
 const workbenchStore = useCrmWorkbenchStore()

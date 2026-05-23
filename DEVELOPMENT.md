@@ -1012,7 +1012,7 @@ npm install echarts-wordcloud
 | 阶段七：工作流 | 2.7（10分） | ✅ 已完成 | 2026-05-23 | 合同4节点审批+BPMN图+6种操作 |
 | 阶段八：API 服务市场 | 2.10（5分） | ✅ 已完成 | 2026-05-23 | API CRUD+上下架+RestTemplate在线调试+示例接口 |
 | 阶段九：工作台小组件 | 2.9（5分） | ✅ 已完成 | 2026-05-23 | vuedraggable拖拽+5组件+待办跳转审批 |
-| 浏览器插件 | 2.8（5分） | ⬜ 待开发 | — | — |
+| 阶段十：智能表单插件 | 2.8（5分） | ✅ 已完成 | 2026-05-25 | Chrome 原生扩展：13 条校验规则 + 模板保存 + 一键填充 |
 | 项目部署 | 第三部分（5分） | ⬜ 待开发 | — | — |
 
 ### 阶段一交付物清单
@@ -1093,6 +1093,16 @@ npm install echarts-wordcloud
 | 前端 API | `web/src/api/crm/workbench.js` |
 | Pinia Store | `web/src/stores/crm/workbench.js` |
 | 前端页面 | `web/src/views/crm/workbench/index.vue` + 5 个小组件 |
+
+### 阶段十交付物清单
+
+| 类型 | 路径 |
+|---|---|
+| 源码 | `browser-plugin/`（完整 Chrome 扩展目录） |
+| 扩展清单 | `browser-plugin/manifest.json`（Manifest V3） |
+| 核心逻辑 | `browser-plugin/content.js` |
+| 注入样式 | `browser-plugin/content.css` |
+| 说明文档 | `browser-plugin/README.md` |
 
 ### 启动前需执行的 SQL（按顺序）
 

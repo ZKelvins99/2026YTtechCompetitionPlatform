@@ -20,4 +20,6 @@ public interface CrmWorkbenchMapper
     int countCustomerThisMonthByCreateBy(@Param("createBy") String createBy);
 
     List<Map<String, Object>> selectOpportunityStageStats(@Param("createBy") String createBy);
+
+    List<Map<String, Object>> selectExpiringContracts();
 }
