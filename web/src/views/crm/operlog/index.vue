@@ -1,6 +1,8 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch" label-width="80px">
+  <div class="app-container crm-page">
+    <crm-page-header title="CRM 操作日志" description="全量接口审计：入参出参、操作人、TraceId 链路及 SQL 语句追踪。" />
+    <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
+    <el-form :model="queryParams" ref="queryRef" :inline="true" label-width="80px">
       <el-form-item label="操作人" prop="operator">
         <el-input v-model="queryParams.operator" placeholder="请输入操作人" clearable style="width: 180px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -23,7 +25,9 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+    </el-card>
 
+    <el-card shadow="never" class="crm-panel">
     <el-row :gutter="10" class="mb8">
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
@@ -53,6 +57,7 @@
     </el-table>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
+    </el-card>
 
     <el-dialog title="操作日志详情" v-model="detailOpen" width="780px" append-to-body destroy-on-close>
       <el-descriptions :column="2" border size="small" class="mb12">

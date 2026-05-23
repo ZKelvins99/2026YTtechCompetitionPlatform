@@ -43,6 +43,7 @@ import ImageUpload from "@/components/ImageUpload"
 import ImagePreview from "@/components/ImagePreview"
 // 字典标签组件
 import DictTag from '@/components/DictTag'
+import CrmPageHeader from '@/components/Crm/PageHeader.vue'
 
 const app = createApp(App)
 
@@ -64,6 +65,7 @@ app.component('FileUpload', FileUpload)
 app.component('ImageUpload', ImageUpload)
 app.component('ImagePreview', ImagePreview)
 app.component('RightToolbar', RightToolbar)
+app.component('CrmPageHeader', CrmPageHeader)
 app.component('Editor', Editor)
 
 app.use(router)

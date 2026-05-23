@@ -1,5 +1,9 @@
 <template>
-  <div class="app-container workbench-page">
+  <div class="app-container crm-page workbench-page">
+    <crm-page-header
+      title="CRM 工作台"
+      description="拖拽布局、添加小组件、保存个性化首页；待办审批支持点击跳转办理。"
+    />
     <div class="toolbar">
       <el-button type="primary" icon="Plus" @click="openAdd = true">添加组件</el-button>
       <el-button type="success" icon="Check" @click="handleSave" v-hasPermi="['crm:workbench:save']">保存布局</el-button>

@@ -1,6 +1,8 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+  <div class="app-container crm-page">
+    <crm-page-header title="消息记录" description="查看已发消息，支持撤回与重发。" />
+    <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
+    <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="消息标题" prop="title">
         <el-input v-model="queryParams.title" placeholder="请输入标题" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -16,7 +18,9 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+    </el-card>
 
+    <el-card shadow="never" class="crm-panel">
     <el-row :gutter="10" class="mb8">
       <right-toolbar v-model:showSearch="showSearch" @queryTable="getList" />
     </el-row>
@@ -43,6 +47,7 @@
     </el-table>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
+    </el-card>
   </div>
 </template>
 

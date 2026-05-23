@@ -1,6 +1,7 @@
 <template>
-  <div class="app-container">
-    <el-card shadow="never">
+  <div class="app-container crm-page">
+    <crm-page-header title="发送消息" description="引用已有模板，选择接收人并完成消息发送。" />
+    <el-card shadow="never" class="crm-panel">
       <template #header><span>发送 CRM 消息</span></template>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="max-width: 720px">
         <el-form-item label="选择模板" prop="templateId">

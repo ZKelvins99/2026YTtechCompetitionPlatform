@@ -1,6 +1,11 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+  <div class="app-container crm-page">
+    <crm-page-header
+      title="客户管理"
+      description="客户主数据维护，支持多条件查询、增删改查、列排序、自定义列显示与 Excel 导出。"
+    />
+    <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
+    <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="客户名称" prop="customerName">
         <el-input v-model="queryParams.customerName" placeholder="请输入客户名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -17,7 +22,9 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+    </el-card>
 
+    <el-card shadow="never" class="crm-panel">
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['crm:customer:add']">新增</el-button>
@@ -69,6 +76,7 @@
     </el-table>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
+    </el-card>
 
     <el-dialog :title="title" v-model="open" width="680px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">

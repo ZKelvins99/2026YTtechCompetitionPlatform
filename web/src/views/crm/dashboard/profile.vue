@@ -1,12 +1,10 @@
 <template>
-  <div class="app-container profile-page">
-    <div class="profile-header">
-      <div>
-        <h2 class="page-title">CRM 用户画像</h2>
-        <p class="page-sub">{{ userStore.nickName }}（{{ userStore.name }}）</p>
-      </div>
-      <el-button icon="Refresh" @click="loadProfile">刷新数据</el-button>
-    </div>
+  <div class="app-container profile-page crm-page">
+    <crm-page-header title="CRM 用户画像" :description="`${userStore.nickName}（${userStore.name}）— 标签云、环形图、雷达图，业务数据变更后自动联动刷新。`">
+      <template #extra>
+        <el-button icon="Refresh" @click="loadProfile">刷新数据</el-button>
+      </template>
+    </crm-page-header>
 
     <el-row :gutter="16" v-loading="loading">
       <el-col :span="8">

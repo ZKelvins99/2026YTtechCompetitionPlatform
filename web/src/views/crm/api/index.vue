@@ -1,6 +1,10 @@
 <template>
-  <div class="app-container">
-    <el-tabs v-model="activeTab">
+  <div class="app-container crm-page">
+    <crm-page-header
+      title="API 服务市场"
+      description="API 全生命周期管理：发布、在线调试、上下架、编辑与删除。"
+    />
+    <el-tabs v-model="activeTab" class="crm-panel-tabs">
       <el-tab-pane label="API 市场" name="market">
         <el-row :gutter="16">
           <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="item in marketList" :key="item.id" class="mb16">

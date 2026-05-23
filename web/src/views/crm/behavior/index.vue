@@ -1,5 +1,9 @@
 <template>
-  <div class="app-container behavior-page">
+  <div class="app-container behavior-page crm-page">
+    <crm-page-header
+      title="客户行为记录"
+      description="海量数据：Excel 异步导入 10 万+ 条、无分页滚动加载，实时展示接口响应耗时。"
+    />
     <el-alert
       v-if="responseTime !== null"
       :title="'接口响应时间：' + responseTime + ' ms'"

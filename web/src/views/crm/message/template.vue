@@ -1,6 +1,8 @@
 <template>
-  <div class="app-container">
-    <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="showSearch">
+  <div class="app-container crm-page">
+    <crm-page-header title="消息模板" description="自定义配置消息模板，供发送页引用。" />
+    <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
+    <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="模板名称" prop="templateName">
         <el-input v-model="queryParams.templateName" placeholder="请输入模板名称" clearable style="width: 200px" @keyup.enter="handleQuery" />
       </el-form-item>
@@ -14,7 +16,9 @@
         <el-button icon="Refresh" @click="resetQuery">重置</el-button>
       </el-form-item>
     </el-form>
+    </el-card>
 
+    <el-card shadow="never" class="crm-panel">
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
         <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['crm:message:template:add']">新增</el-button>
@@ -51,6 +55,7 @@
     </el-table>
 
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
+    </el-card>
 
     <el-dialog :title="title" v-model="open" width="640px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="90px">
