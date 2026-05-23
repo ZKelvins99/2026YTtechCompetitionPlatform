@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmCustomerMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmCustomer" id="CrmCustomerResult">
+        <result property="id"           column="id"            />
+        <result property="customerNo"   column="customer_no"   />
+        <result property="customerName" column="customer_name" />
+        <result property="levelId"      column="level_id"      />
+        <result property="levelName"    column="level_name"    />
+        <result property="industry"     column="industry"      />
+        <result property="province"     column="province"      />
+        <result property="city"         column="city"          />
+        <result property="address"      column="address"       />
+        <result property="phone"        column="phone"         />
+        <result property="email"        column="email"         />
+        <result property="remark"       column="remark"        />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+    </resultMap>
+
+    <sql id="selectCrmCustomerVo">
+        select c.id, c.customer_no, c.customer_name, c.level_id, l.level_name,
+               c.industry, c.province, c.city, c.address, c.phone, c.email, c.remark,
+               c.create_by, c.create_time, c.update_by, c.update_time
+        from crm_customer c
+        left join crm_customer_level l on c.level_id = l.id
+    </sql>
+
+    <select id="selectCrmCustomerById" parameterType="Long" resultMap="CrmCustomerResult">
+        <include refid="selectCrmCustomerVo"/>
+        where c.id = #{id}
+    </select>
+
+    <select id="selectCrmCustomerList" parameterType="com.ruoyi.system.crm.domain.CrmCustomer" resultMap="CrmCustomerResult">
+        <include refid="selectCrmCustomerVo"/>
+        <where>
+            <if test="customerName != null and customerName != ''">
+                AND c.customer_name like concat(concat('%', #{customerName}), '%')
+            </if>
+            <if test="levelId != null">
+                AND c.level_id = #{levelId}
+            </if>
+            <if test="industry != null and industry != ''">
+                AND c.industry like concat(concat('%', #{industry}), '%')
+            </if>
+        </where>
+    </select>
+
+    <insert id="insertCrmCustomer" parameterType="com.ruoyi.system.crm.domain.CrmCustomer">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_customer.nextval as id from DUAL
+        </selectKey>
+        insert into crm_customer (
+            id, customer_no, customer_name, level_id, industry, province, city,
+            address, phone, email, remark, create_by, create_time
+        ) values (
+            #{id}, #{customerNo}, #{customerName}, #{levelId}, #{industry}, #{province}, #{city},
+            #{address}, #{phone}, #{email}, #{remark}, #{createBy}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmCustomer" parameterType="com.ruoyi.system.crm.domain.CrmCustomer">
+        update crm_customer
+        <set>
+            <if test="customerName != null and customerName != ''">customer_name = #{customerName},</if>
+            <if test="levelId != null">level_id = #{levelId},</if>
+            <if test="industry != null">industry = #{industry},</if>
+            <if test="province != null">province = #{province},</if>
+            <if test="city != null">city = #{city},</if>
+            <if test="address != null">address = #{address},</if>
+            <if test="phone != null">phone = #{phone},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCrmCustomerById" parameterType="Long">
+        delete from crm_customer where id = #{id}
+    </delete>
+
+    <delete id="deleteCrmCustomerByIds" parameterType="Long">
+        delete from crm_customer where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmContactMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmContact" id="CrmContactResult">
+        <result property="id"              column="id"               />
+        <result property="customerId"      column="customer_id"      />
+        <result property="customerName"    column="customer_name"    />
+        <result property="contactName"     column="contact_name"     />
+        <result property="contactTypeId"   column="contact_type_id"  />
+        <result property="contactTypeName" column="contact_type_name"/>
+        <result property="contactValue"    column="contact_value"    />
+        <result property="position"        column="position"         />
+        <result property="isPrimary"       column="is_primary"       />
+        <result property="createTime"      column="create_time"      />
+    </resultMap>
+
+    <sql id="selectCrmContactVo">
+        select ct.id, ct.customer_id, cu.customer_name, ct.contact_name,
+               ct.contact_type_id, ty.type_name as contact_type_name,
+               ct.contact_value, ct.position, ct.is_primary, ct.create_time
+        from crm_contact ct
+        left join crm_customer cu on ct.customer_id = cu.id
+        left join crm_contact_type ty on ct.contact_type_id = ty.id
+    </sql>
+
+    <select id="selectCrmContactById" parameterType="Long" resultMap="CrmContactResult">
+        <include refid="selectCrmContactVo"/>
+        where ct.id = #{id}
+    </select>
+
+    <select id="selectCrmContactByCustomerId" parameterType="Long" resultMap="CrmContactResult">
+        <include refid="selectCrmContactVo"/>
+        where ct.customer_id = #{customerId}
+        order by ct.is_primary desc, ct.id
+    </select>
+
+    <select id="selectCrmContactList" parameterType="com.ruoyi.system.crm.domain.CrmContact" resultMap="CrmContactResult">
+        <include refid="selectCrmContactVo"/>
+        <where>
+            <if test="contactName != null and contactName != ''">
+                AND ct.contact_name like concat(concat('%', #{contactName}), '%')
+            </if>
+            <if test="customerId != null">
+                AND ct.customer_id = #{customerId}
+            </if>
+        </where>
+        order by ct.id desc
+    </select>
+
+    <insert id="insertCrmContact" parameterType="com.ruoyi.system.crm.domain.CrmContact">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_contact.nextval as id from DUAL
+        </selectKey>
+        insert into crm_contact (
+            id, customer_id, contact_name, contact_type_id, contact_value, position, is_primary, create_time
+        ) values (
+            #{id}, #{customerId}, #{contactName}, #{contactTypeId}, #{contactValue}, #{position},
+            #{isPrimary}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmContact" parameterType="com.ruoyi.system.crm.domain.CrmContact">
+        update crm_contact
+        <set>
+            <if test="customerId != null">customer_id = #{customerId},</if>
+            <if test="contactName != null and contactName != ''">contact_name = #{contactName},</if>
+            <if test="contactTypeId != null">contact_type_id = #{contactTypeId},</if>
+            <if test="contactValue != null">contact_value = #{contactValue},</if>
+            <if test="position != null">position = #{position},</if>
+            <if test="isPrimary != null">is_primary = #{isPrimary},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCrmContactById" parameterType="Long">
+        delete from crm_contact where id = #{id}
+    </delete>
+
+    <delete id="deleteCrmContactByIds" parameterType="Long">
+        delete from crm_contact where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>
