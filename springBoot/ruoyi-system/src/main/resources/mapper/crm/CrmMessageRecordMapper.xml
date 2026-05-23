@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmMessageRecordMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmMessageRecord" id="CrmMessageRecordResult">
+        <result property="id" column="id"/>
+        <result property="templateId" column="template_id"/>
+        <result property="senderId" column="sender_id"/>
+        <result property="receiverId" column="receiver_id"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="status" column="status"/>
+        <result property="sendTime" column="send_time"/>
+        <result property="recallTime" column="recall_time"/>
+        <result property="senderName" column="sender_name"/>
+        <result property="receiverName" column="receiver_name"/>
+        <result property="templateName" column="template_name"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select r.id, r.template_id, r.sender_id, r.receiver_id, r.title, r.content, r.status,
+               r.send_time, r.recall_time,
+               su.nick_name as sender_name, ru.nick_name as receiver_name, t.template_name
+        from crm_message_record r
+        left join sys_user su on r.sender_id = su.user_id
+        left join sys_user ru on r.receiver_id = ru.user_id
+        left join crm_message_template t on r.template_id = t.id
+    </sql>
+
+    <select id="selectCrmMessageRecordById" resultMap="CrmMessageRecordResult">
+        <include refid="selectVo"/> where r.id = #{id}
+    </select>
+
+    <select id="selectCrmMessageRecordList" resultMap="CrmMessageRecordResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="title != null and title != ''">
+                AND r.title like concat(concat('%', #{title}), '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND r.status = #{status}
+            </if>
+            <if test="senderId != null">
+                AND r.sender_id = #{senderId}
+            </if>
+            <if test="receiverId != null">
+                AND r.receiver_id = #{receiverId}
+            </if>
+        </where>
+        order by r.id desc
+    </select>
+
+    <insert id="insertCrmMessageRecord">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_message_record.nextval as id from DUAL
+        </selectKey>
+        insert into crm_message_record (
+            id, template_id, sender_id, receiver_id, title, content, status, send_time
+        ) values (
+            #{id}, #{templateId}, #{senderId}, #{receiverId}, #{title}, #{content}, #{status}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmMessageRecord">
+        update crm_message_record
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="sendTime != null">send_time = #{sendTime},</if>
+            recall_time = #{recallTime}
+        </set>
+        where id = #{id}
+    </update>
+
+    <select id="countUnreadByReceiver" resultType="int">
+        select count(1) from crm_message_record
+        where receiver_id = #{receiverId} and status = '0'
+    </select>
+
+    <select id="selectUnreadList" resultMap="CrmMessageRecordResult">
+        select * from (
+            <include refid="selectVo"/>
+            where r.receiver_id = #{receiverId} and r.status = '0'
+            order by r.send_time desc
+        ) where rownum &lt;= #{limit}
+    </select>
+</mapper>

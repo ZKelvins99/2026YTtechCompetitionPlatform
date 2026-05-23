@@ -32,7 +32,9 @@ public class CrmOperLogAspect
 
     @Around("execution(* com.ruoyi.system.crm.controller..*(..)) "
         + "&& !execution(* com.ruoyi.system.crm.controller.CrmOperLogController.*(..)) "
-        + "&& !execution(* com.ruoyi.system.crm.controller.CrmDashboardController.*(..))")
+        + "&& !execution(* com.ruoyi.system.crm.controller.CrmDashboardController.*(..)) "
+        + "&& !execution(* com.ruoyi.system.crm.controller.CrmMessageRecordController.unreadCount(..)) "
+        + "&& !execution(* com.ruoyi.system.crm.controller.CrmMessageRecordController.unreadList(..))")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable
     {
         long start = System.currentTimeMillis();

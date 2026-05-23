@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmMessageTemplateMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmMessageTemplate" id="CrmMessageTemplateResult">
+        <result property="id" column="id"/>
+        <result property="templateName" column="template_name"/>
+        <result property="templateType" column="template_type"/>
+        <result property="title" column="title"/>
+        <result property="content" column="content"/>
+        <result property="variables" column="variables"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, template_name, template_type, title, content, variables, status, create_time
+        from crm_message_template
+    </sql>
+
+    <select id="selectCrmMessageTemplateById" resultMap="CrmMessageTemplateResult">
+        <include refid="selectVo"/> where id = #{id}
+    </select>
+
+    <select id="selectCrmMessageTemplateList" resultMap="CrmMessageTemplateResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="templateName != null and templateName != ''">
+                AND template_name like concat(concat('%', #{templateName}), '%')
+            </if>
+            <if test="templateType != null and templateType != ''">
+                AND template_type = #{templateType}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by id desc
+    </select>
+
+    <select id="selectActiveTemplateList" resultMap="CrmMessageTemplateResult">
+        <include refid="selectVo"/> where status = '0' order by id desc
+    </select>
+
+    <insert id="insertCrmMessageTemplate">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_message_template.nextval as id from DUAL
+        </selectKey>
+        insert into crm_message_template (
+            id, template_name, template_type, title, content, variables, status, create_time
+        ) values (
+            #{id}, #{templateName}, #{templateType}, #{title}, #{content}, #{variables}, #{status}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmMessageTemplate">
+        update crm_message_template
+        <set>
+            <if test="templateName != null and templateName != ''">template_name = #{templateName},</if>
+            <if test="templateType != null and templateType != ''">template_type = #{templateType},</if>
+            <if test="title != null and title != ''">title = #{title},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="variables != null">variables = #{variables},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCrmMessageTemplateByIds">
+        delete from crm_message_template where id in
+        <foreach collection="array" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+</mapper>

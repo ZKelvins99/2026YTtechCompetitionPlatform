@@ -33,6 +33,8 @@
           <size-select id="size-select" class="right-menu-item hover-effect" />
         </el-tooltip>
 
+        <crm-header-message id="crm-header-message" class="right-menu-item hover-effect" />
+
         <el-tooltip content="消息通知" effect="dark" placement="bottom">
           <header-notice id="header-notice" class="right-menu-item hover-effect" />
         </el-tooltip>
@@ -81,6 +83,7 @@ import useUserStore from '@/store/modules/user'
 import useLockStore from '@/store/modules/lock'
 import useSettingsStore from '@/store/modules/settings'
 import HeaderNotice from './HeaderNotice'
+import CrmHeaderMessage from './CrmHeaderMessage'
 
 const route = useRoute()
 const router = useRouter()
