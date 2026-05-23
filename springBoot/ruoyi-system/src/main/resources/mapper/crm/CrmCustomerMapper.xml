@@ -96,4 +96,8 @@
         </foreach>
     </delete>
 
+    <select id="countAll" resultType="long">
+        select count(1) from crm_customer
+    </select>
+
 </mapper>

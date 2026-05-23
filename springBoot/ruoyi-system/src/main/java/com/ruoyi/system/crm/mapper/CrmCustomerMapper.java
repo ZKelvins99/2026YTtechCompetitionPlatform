@@ -22,4 +22,6 @@ public interface CrmCustomerMapper
     int deleteCrmCustomerById(Long id);
 
     int deleteCrmCustomerByIds(Long[] ids);
+
+    long countAll();
 }
