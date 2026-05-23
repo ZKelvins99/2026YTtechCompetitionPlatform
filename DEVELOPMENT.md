@@ -1011,7 +1011,7 @@ npm install echarts-wordcloud
 | 阶段六：用户画像 | 2.6（5分） | ✅ 已完成 | 2026-05-23 | 标签云+环形图+雷达图+业务CRUD联动刷新 |
 | 阶段七：工作流 | 2.7（10分） | ✅ 已完成 | 2026-05-23 | 合同4节点审批+BPMN图+6种操作 |
 | 阶段八：API 服务市场 | 2.10（5分） | ✅ 已完成 | 2026-05-23 | API CRUD+上下架+RestTemplate在线调试+示例接口 |
-| 阶段九：工作台小组件 | 2.9（5分） | ⬜ 待开发 | — | — |
+| 阶段九：工作台小组件 | 2.9（5分） | ✅ 已完成 | 2026-05-23 | vuedraggable拖拽+5组件+待办跳转审批 |
 | 浏览器插件 | 2.8（5分） | ⬜ 待开发 | — | — |
 | 项目部署 | 第三部分（5分） | ⬜ 待开发 | — | — |
 
@@ -1082,6 +1082,18 @@ npm install echarts-wordcloud
 | 前端 API | `web/src/api/crm/apiMarket.js` |
 | 前端页面 | `web/src/views/crm/api/index.vue` |
 
+### 阶段九交付物清单
+
+| 类型 | 路径 |
+|---|---|
+| 建表 | `crm_workbench_layout` 已在 `SQL/01_init_tables.sql` |
+| 后端 Controller | `CrmWorkbenchController.java` |
+| 后端 Service/Mapper | `CrmWorkbenchServiceImpl.java` + `CrmWorkbenchMapper.xml` |
+| SQL 菜单 | `SQL/10_crm_workbench_menu.sql` |
+| 前端 API | `web/src/api/crm/workbench.js` |
+| Pinia Store | `web/src/stores/crm/workbench.js` |
+| 前端页面 | `web/src/views/crm/workbench/index.vue` + 5 个小组件 |
+
 ### 启动前需执行的 SQL（按顺序）
 
 1. 若依基础库（已有则跳过）：`springBoot/sql/ry_20260417.sql`
@@ -1094,3 +1106,4 @@ npm install echarts-wordcloud
 8. 海量行为数据菜单：`SQL/07_crm_behavior_menu.sql`
 9. 用户画像菜单：`SQL/08_crm_profile_menu.sql`
 10. API 服务市场菜单：`SQL/09_crm_api_menu.sql`
+11. 工作台菜单：`SQL/10_crm_workbench_menu.sql`

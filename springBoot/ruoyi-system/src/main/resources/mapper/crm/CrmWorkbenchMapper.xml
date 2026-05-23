@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmWorkbenchMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmWorkbenchLayout" id="LayoutResult">
+        <result property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="layoutJson" column="layout_json"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="selectByUserId" resultMap="LayoutResult">
+        select id, user_id, layout_json, update_time from crm_workbench_layout where user_id = #{userId}
+    </select>
+
+    <insert id="insertLayout">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_workbench_layout.nextval as id from DUAL
+        </selectKey>
+        insert into crm_workbench_layout (id, user_id, layout_json, update_time)
+        values (#{id}, #{userId}, #{layoutJson}, sysdate)
+    </insert>
+
+    <update id="updateLayout">
+        update crm_workbench_layout set layout_json = #{layoutJson}, update_time = sysdate where user_id = #{userId}
+    </update>
+
+    <select id="selectPendingApprovals" resultType="map">
+        select i.id as "instanceId", i.business_id as "businessId", i.business_no as "businessNo",
+               c.contract_name as "contractName", n.node_name as "nodeName", i.start_time as "startTime"
+        from crm_workflow_node n
+        inner join crm_workflow_instance i on n.instance_id = i.id
+        left join crm_contract c on i.business_id = c.id
+        where n.approver_id = #{userId} and n.status = '0' and i.status = '0' and i.current_node_id = n.id
+        order by i.start_time desc
+    </select>
+
+    <select id="countCustomerByCreateBy" resultType="int">
+        select count(1) from crm_customer where create_by = #{createBy}
+    </select>
+
+    <select id="countCustomerThisMonthByCreateBy" resultType="int">
+        select count(1) from crm_customer
+        where create_by = #{createBy}
+          and trunc(create_time, 'MM') = trunc(sysdate, 'MM')
+    </select>
+
+    <select id="selectOpportunityStageStats" resultType="map">
+        select s.stage_name as "name", count(1) as "value"
+        from crm_opportunity o
+        inner join crm_opportunity_stage s on o.stage_id = s.id
+        where o.create_by = #{createBy}
+        group by s.stage_name, s.sort_order
+        order by s.sort_order
+    </select>
+</mapper>
