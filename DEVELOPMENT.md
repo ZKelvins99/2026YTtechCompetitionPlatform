@@ -435,45 +435,27 @@ web/src/
 
 ### 阶段二：Excel 批量导入（对应 2.2，得分目标：10分）
 
+> **状态：✅ 已完成**（2026-05-23）  
+> **简介**：完成商机管理 CRUD、Excel 批量导入（Apache POI 逐行解析）、完整校验（必填/数字/码表/日期）、Excel 内去重与数据库查重，前端导入对话框含汇总卡片与错误详情表格（行/列/字段/原因，失败红/跳过橙/成功绿高亮）。
+
 #### 后端任务
 
-1. 商机管理 `/crm/opportunity` CRUD 接口（同客户管理模式）
-2. 增加 Excel 导入接口：
-   - `POST /crm/opportunity/import` — 接收 Excel 文件（`MultipartFile`），返回校验结果 JSON
-   - 使用 Apache POI 逐行解析（已集成在若依中）
-3. **数据校验逻辑**（4分）：
-   - 必填字段检查（商机名称、客户名称）
-   - 数据类型检查（预计金额须为数字）
-   - 码表匹配检查（阶段编码在 `CRM_OPPORTUNITY_STAGE` 中存在）
-   - 日期格式检查（`EXPECTED_CLOSE_DATE`）
-   - 每行校验出错时记录对象：`{ row: 行号, col: 列号, field: 字段名, message: 错误描述 }`
-   - 收集全部错误后统一返回，前端精准展示
-4. **重复数据处理**（6分）：
-   - Excel 内重复：按「商机名称 + 客户名称」HashSet 判断，重复行记录错误"与第 X 行重复"，仅保留首条
-   - 数据库重复：导入前 `SELECT` 查询已有记录，重复则跳过并提示"数据库已存在相同记录"
+- [x] 1. 商机管理 `/crm/opportunity` CRUD 接口
+- [x] 2. `POST /crm/opportunity/import` — MultipartFile 导入，返回校验结果 JSON
+- [x] 3. 数据校验：必填、金额数字、阶段码表、日期格式，错误项 `{row,col,field,message}`
+- [x] 4. 重复处理：Excel 内「商机名称+客户名称」去重；数据库查重跳过
 
 #### 前端任务
 
-1. 新增 `web/src/views/crm/opportunity/index.vue`（商机列表）：
-   - 基础表格 CRUD 同客户管理
-   - 表格上方增加「导入 Excel」按钮
-   - 点击弹出导入对话框（`<el-dialog>`）：
-     - `<el-upload>` 组件，限制 `.xlsx/.xls` 格式
-     - 「下载模板」链接
-     - 上传后展示校验结果面板：
-       - 汇总卡片：成功 X 条 / 失败 X 条 / 跳过 X 条（重复）
-       - `<el-table>` 展示错误详情：行号、列号、字段名、错误原因
-       - 失败行红色高亮，成功行绿色标记
-   - 导入成功后自动关闭弹窗并刷新列表
-
-2. 新增 `web/src/api/crm/opportunity.js`（含 import 接口）
+- [x] 1. `web/src/views/crm/opportunity/index.vue` — CRUD + 导入对话框 + 结果面板
+- [x] 2. `web/src/api/crm/opportunity.js` — 含 import 接口
 
 #### 得分覆盖
 
-| 得分点 | 分值 | 实现方式 |
-|---|---|---|
-| Excel批量导入 + 格式校验 + 精准错误位置提示 | 4分 | 后端逐行校验返回 `{row,col,field,message}`，前端 `<el-table>` 展示 |
-| 重复数据自动识别 + 去重 + 无重复入库 | 6分 | Excel内HashSet去重 + DB查重跳过 |
+| 得分点 | 分值 | 状态 | 实现方式 |
+|---|---|---|---|
+| Excel批量导入 + 格式校验 + 精准错误位置提示 | 4分 | ✅ | POI 逐行校验 + 前端 el-table 展示 row/col/field |
+| 重复数据自动识别 + 去重 + 无重复入库 | 6分 | ✅ | HashMap 首行保留 + countByNameAndCustomer 查重 |
 
 ---
 
@@ -1049,7 +1031,7 @@ npm install echarts-wordcloud
 | 阶段 | 对应得分 | 状态 | 完成日期 | 简要说明 |
 |---|---|---|---|---|
 | 阶段一：基础设施 + 基础 CRUD | 2.1（10分） | ✅ 已完成 | 2026-05-23 | 建表脚本、客户/联系人 CRUD、列排序/列显隐/Excel 导出 |
-| 阶段二：Excel 批量导入 | 2.2（10分） | ⬜ 待开发 | — | — |
+| 阶段二：Excel 批量导入 | 2.2（10分） | ✅ 已完成 | 2026-05-23 | 商机 CRUD + Excel 导入校验去重 + 错误行/列精准提示 |
 | 阶段三：日志与数据可视化 | 2.3（10分） | ⬜ 待开发 | — | — |
 | 阶段四：消息中心 | 2.4（5分） | ⬜ 待开发 | — | — |
 | 阶段五：海量数据加载 | 2.5（10分） | ⬜ 待开发 | — | — |
@@ -1076,3 +1058,4 @@ npm install echarts-wordcloud
 1. 若依基础库（已有则跳过）：`springBoot/sql/ry_20260417.sql`
 2. CRM 建表：`SQL/01_init_tables.sql`
 3. CRM 菜单：`SQL/02_crm_menu.sql`
+4. 商机菜单：`SQL/03_crm_opportunity_menu.sql`

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmOpportunityMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmOpportunity" id="CrmOpportunityResult">
+        <result property="id"                  column="id"                   />
+        <result property="opportunityName"     column="opportunity_name"     />
+        <result property="customerId"          column="customer_id"          />
+        <result property="customerName"        column="customer_name"        />
+        <result property="stageId"             column="stage_id"             />
+        <result property="stageName"           column="stage_name"           />
+        <result property="stageCode"           column="stage_code"           />
+        <result property="estimatedAmount"     column="estimated_amount"     />
+        <result property="expectedCloseDate"   column="expected_close_date"  />
+        <result property="createBy"            column="create_by"            />
+        <result property="createTime"          column="create_time"          />
+        <result property="updateTime"          column="update_time"          />
+    </resultMap>
+
+    <sql id="selectCrmOpportunityVo">
+        select o.id, o.opportunity_name, o.customer_id, c.customer_name,
+               o.stage_id, s.stage_name, s.stage_code,
+               o.estimated_amount, o.expected_close_date,
+               o.create_by, o.create_time, o.update_time
+        from crm_opportunity o
+        left join crm_customer c on o.customer_id = c.id
+        left join crm_opportunity_stage s on o.stage_id = s.id
+    </sql>
+
+    <select id="selectCrmOpportunityById" parameterType="Long" resultMap="CrmOpportunityResult">
+        <include refid="selectCrmOpportunityVo"/>
+        where o.id = #{id}
+    </select>
+
+    <select id="selectCrmOpportunityList" parameterType="com.ruoyi.system.crm.domain.CrmOpportunity" resultMap="CrmOpportunityResult">
+        <include refid="selectCrmOpportunityVo"/>
+        <where>
+            <if test="opportunityName != null and opportunityName != ''">
+                AND o.opportunity_name like concat(concat('%', #{opportunityName}), '%')
+            </if>
+            <if test="customerId != null">
+                AND o.customer_id = #{customerId}
+            </if>
+            <if test="stageId != null">
+                AND o.stage_id = #{stageId}
+            </if>
+        </where>
+        order by o.id desc
+    </select>
+
+    <select id="countByNameAndCustomer" resultType="int">
+        select count(1) from crm_opportunity
+        where opportunity_name = #{opportunityName} and customer_id = #{customerId}
+    </select>
+
+    <insert id="insertCrmOpportunity" parameterType="com.ruoyi.system.crm.domain.CrmOpportunity">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_opportunity.nextval as id from DUAL
+        </selectKey>
+        insert into crm_opportunity (
+            id, opportunity_name, customer_id, stage_id,
+            estimated_amount, expected_close_date, create_by, create_time
+        ) values (
+            #{id}, #{opportunityName}, #{customerId}, #{stageId},
+            #{estimatedAmount}, #{expectedCloseDate}, #{createBy}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmOpportunity" parameterType="com.ruoyi.system.crm.domain.CrmOpportunity">
+        update crm_opportunity
+        <set>
+            <if test="opportunityName != null and opportunityName != ''">opportunity_name = #{opportunityName},</if>
+            <if test="customerId != null">customer_id = #{customerId},</if>
+            <if test="stageId != null">stage_id = #{stageId},</if>
+            <if test="estimatedAmount != null">estimated_amount = #{estimatedAmount},</if>
+            <if test="expectedCloseDate != null">expected_close_date = #{expectedCloseDate},</if>
+            update_time = sysdate
+        </set>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteCrmOpportunityById" parameterType="Long">
+        delete from crm_opportunity where id = #{id}
+    </delete>
+
+    <delete id="deleteCrmOpportunityByIds" parameterType="Long">
+        delete from crm_opportunity where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+</mapper>

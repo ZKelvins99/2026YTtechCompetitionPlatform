@@ -1,6 +1,7 @@
 package com.ruoyi.system.crm.mapper;
 
 import java.util.List;
+import org.apache.ibatis.annotations.Param;
 import com.ruoyi.system.crm.domain.CrmCustomer;
 
 /**
@@ -9,6 +10,8 @@ import com.ruoyi.system.crm.domain.CrmCustomer;
 public interface CrmCustomerMapper
 {
     CrmCustomer selectCrmCustomerById(Long id);
+
+    CrmCustomer selectCrmCustomerByName(@Param("customerName") String customerName);
 
     List<CrmCustomer> selectCrmCustomerList(CrmCustomer customer);
 
