@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmCustomerBehaviorMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmCustomerBehavior" id="CrmCustomerBehaviorResult">
+        <result property="id" column="id"/>
+        <result property="customerId" column="customer_id"/>
+        <result property="behaviorType" column="behavior_type"/>
+        <result property="description" column="description"/>
+        <result property="behaviorTime" column="behavior_time"/>
+        <result property="createTime" column="create_time"/>
+    </resultMap>
+
+    <insert id="batchInsert">
+        INSERT ALL
+        <foreach collection="list" item="item">
+            INTO crm_customer_behavior (id, customer_id, behavior_type, description, behavior_time, create_time)
+            VALUES (seq_crm_customer_behavior.nextval, #{item.customerId}, #{item.behaviorType}, #{item.description}, #{item.behaviorTime}, sysdate)
+        </foreach>
+        SELECT 1 FROM DUAL
+    </insert>
+
+    <select id="selectScrollList" resultMap="CrmCustomerBehaviorResult">
+        SELECT * FROM (
+            SELECT id, customer_id, behavior_type, description, behavior_time, create_time
+            FROM crm_customer_behavior
+            WHERE id &gt; #{lastId}
+            ORDER BY id
+        ) WHERE ROWNUM &lt;= #{pageSize}
+    </select>
+
+    <select id="countTotal" resultType="long">
+        select count(1) from crm_customer_behavior
+    </select>
+</mapper>
