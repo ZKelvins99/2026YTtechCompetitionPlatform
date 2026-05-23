@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmOperLogMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmOperLog" id="CrmOperLogResult">
+        <result property="id" column="id"/>
+        <result property="requestUrl" column="request_url"/>
+        <result property="requestMethod" column="request_method"/>
+        <result property="requestParams" column="request_params"/>
+        <result property="responseResult" column="response_result"/>
+        <result property="sqlStatements" column="sql_statements"/>
+        <result property="traceId" column="trace_id"/>
+        <result property="operator" column="operator"/>
+        <result property="operateTime" column="operate_time"/>
+        <result property="costMillis" column="cost_millis"/>
+        <result property="status" column="status"/>
+        <result property="errorMsg" column="error_msg"/>
+    </resultMap>
+
+    <sql id="selectVo">
+        select id, request_url, request_method, request_params, response_result, sql_statements,
+               trace_id, operator, operate_time, cost_millis, status, error_msg
+        from crm_oper_log
+    </sql>
+
+    <select id="selectCrmOperLogById" resultMap="CrmOperLogResult">
+        <include refid="selectVo"/> where id = #{id}
+    </select>
+
+    <select id="selectCrmOperLogList" resultMap="CrmOperLogResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="operator != null and operator != ''">
+                AND operator like concat(concat('%', #{operator}), '%')
+            </if>
+            <if test="requestUrl != null and requestUrl != ''">
+                AND request_url like concat(concat('%', #{requestUrl}), '%')
+            </if>
+            <if test="params.beginTime != null and params.beginTime != ''">
+                AND operate_time &gt;= to_date(#{params.beginTime}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+            <if test="params.endTime != null and params.endTime != ''">
+                AND operate_time &lt;= to_date(#{params.endTime}, 'yyyy-mm-dd hh24:mi:ss')
+            </if>
+        </where>
+        order by id desc
+    </select>
+
+    <insert id="insertCrmOperLog">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_oper_log.nextval as id from DUAL
+        </selectKey>
+        insert into crm_oper_log (
+            id, request_url, request_method, request_params, response_result, sql_statements,
+            trace_id, operator, operate_time, cost_millis, status, error_msg
+        ) values (
+            #{id}, #{requestUrl}, #{requestMethod}, #{requestParams}, #{responseResult}, #{sqlStatements},
+            #{traceId}, #{operator}, sysdate, #{costMillis}, #{status}, #{errorMsg}
+        )
+    </insert>
+
+    <select id="countToday" resultType="int">
+        select count(1) from crm_oper_log where trunc(operate_time) = trunc(sysdate)
+    </select>
+
+    <select id="countYesterday" resultType="int">
+        select count(1) from crm_oper_log where trunc(operate_time) = trunc(sysdate) - 1
+    </select>
+
+    <select id="countTodayError" resultType="int">
+        select count(1) from crm_oper_log where trunc(operate_time) = trunc(sysdate) and status = '1'
+    </select>
+
+    <select id="selectHourlyStats" resultType="map">
+        select to_char(operate_time, 'HH24') as "hour", count(1) as "count"
+        from crm_oper_log where trunc(operate_time) = trunc(sysdate)
+        group by to_char(operate_time, 'HH24') order by "hour"
+    </select>
+
+    <select id="selectTopUsers" resultType="map">
+        select * from (
+            select operator as "name", count(1) as "value" from crm_oper_log
+            where trunc(operate_time) = trunc(sysdate) and operator is not null
+            group by operator order by value desc
+        ) where rownum &lt;= 5
+    </select>
+
+    <select id="selectModuleStats" resultType="map">
+        select module_name as "name", cnt as "value" from (
+            select case
+                when request_url like '%/crm/customer%' then '客户管理'
+                when request_url like '%/crm/opportunity%' then '商机管理'
+                when request_url like '%/crm/contract%' then '合同管理'
+                when request_url like '%/crm/workflow%' then '工作流'
+                when request_url like '%/crm/contact%' then '联系人'
+                else '其他' end as module_name,
+                count(1) as cnt
+            from crm_oper_log where trunc(operate_time) = trunc(sysdate)
+            group by case
+                when request_url like '%/crm/customer%' then '客户管理'
+                when request_url like '%/crm/opportunity%' then '商机管理'
+                when request_url like '%/crm/contract%' then '合同管理'
+                when request_url like '%/crm/workflow%' then '工作流'
+                when request_url like '%/crm/contact%' then '联系人'
+                else '其他' end
+        )
+    </select>
+
+    <select id="selectRecentLogs" resultMap="CrmOperLogResult">
+        select * from (
+            <include refid="selectVo"/> order by id desc
+        ) where rownum &lt;= #{limit}
+    </select>
+
+</mapper>

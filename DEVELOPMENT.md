@@ -1005,7 +1005,7 @@ npm install echarts-wordcloud
 |---|---|---|---|---|
 | 阶段一：基础设施 + 基础 CRUD | 2.1（10分） | ✅ 已完成 | 2026-05-23 | 建表脚本、客户/联系人 CRUD、列排序/列显隐/Excel 导出 |
 | 阶段二：Excel 批量导入 | 2.2（10分） | ✅ 已完成 | 2026-05-23 | 商机 CRUD + Excel 导入校验去重 + 错误行/列精准提示 |
-| 阶段三：日志与数据可视化 | 2.3（10分） | ⬜ 待开发 | — | — |
+| 阶段三：日志与数据可视化 | 2.3（10分） | ✅ 已完成 | 2026-05-23 | AOP日志+traceId/SQL追踪+oshi大屏+operlog查询详情 |
 | 阶段四：消息中心 | 2.4（5分） | ⬜ 待开发 | — | — |
 | 阶段五：海量数据加载 | 2.5（10分） | ⬜ 待开发 | — | — |
 | 阶段六：用户画像 | 2.6（5分） | ⬜ 待开发 | — | — |
@@ -1026,6 +1026,17 @@ npm install echarts-wordcloud
 | 前端 API | `web/src/api/crm/customer.js`、`contact.js` |
 | 前端页面 | `web/src/views/crm/customer/index.vue`、`contact/index.vue` |
 
+### 阶段三交付物清单
+
+| 类型 | 路径 |
+|---|---|
+| 后端 AOP/Filter | `CrmOperLogAspect.java`、`CrmTraceIdFilter.java`、`CrmSqlInterceptor.java` |
+| 后端 Controller | `CrmOperLogController.java`、`CrmDashboardController.java` |
+| 后端 Service | `CrmOperLogServiceImpl.java`、`CrmDashboardServiceImpl.java`（oshi-core） |
+| SQL 菜单 | `SQL/05_crm_dashboard_operlog_menu.sql` |
+| 前端 API | `web/src/api/crm/dashboard.js`、`operlog.js` |
+| 前端页面 | `web/src/views/crm/dashboard/index.vue`、`operlog/index.vue` |
+
 ### 启动前需执行的 SQL（按顺序）
 
 1. 若依基础库（已有则跳过）：`springBoot/sql/ry_20260417.sql`
@@ -1033,3 +1044,4 @@ npm install echarts-wordcloud
 3. CRM 菜单：`SQL/02_crm_menu.sql`
 4. 商机菜单：`SQL/03_crm_opportunity_menu.sql`
 5. 合同/工作流菜单：`SQL/04_crm_contract_workflow_menu.sql`
+6. 大屏/操作日志菜单：`SQL/05_crm_dashboard_operlog_menu.sql`
