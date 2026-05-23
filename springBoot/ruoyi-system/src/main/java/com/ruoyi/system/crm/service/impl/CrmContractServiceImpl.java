@@ -8,12 +8,16 @@ import org.springframework.stereotype.Service;
 import com.ruoyi.system.crm.domain.CrmContract;
 import com.ruoyi.system.crm.mapper.CrmContractMapper;
 import com.ruoyi.system.crm.service.ICrmContractService;
+import com.ruoyi.system.crm.support.CrmProfileRefreshHelper;
 
 @Service
 public class CrmContractServiceImpl implements ICrmContractService
 {
     @Autowired
     private CrmContractMapper crmContractMapper;
+
+    @Autowired
+    private CrmProfileRefreshHelper profileRefreshHelper;
 
     @Override
     public CrmContract selectCrmContractById(Long id)
@@ -39,18 +43,24 @@ public class CrmContractServiceImpl implements ICrmContractService
         {
             contract.setStatusId(crmContractMapper.selectStatusIdByCode("DRAFT"));
         }
-        return crmContractMapper.insertCrmContract(contract);
+        int rows = crmContractMapper.insertCrmContract(contract);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int updateCrmContract(CrmContract contract)
     {
-        return crmContractMapper.updateCrmContract(contract);
+        int rows = crmContractMapper.updateCrmContract(contract);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int deleteCrmContractByIds(Long[] ids)
     {
-        return crmContractMapper.deleteCrmContractByIds(ids);
+        int rows = crmContractMapper.deleteCrmContractByIds(ids);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 }

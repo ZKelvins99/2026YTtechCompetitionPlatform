@@ -9,6 +9,7 @@ import com.ruoyi.system.crm.domain.CrmCustomer;
 import com.ruoyi.system.crm.mapper.CrmContactMapper;
 import com.ruoyi.system.crm.mapper.CrmCustomerMapper;
 import com.ruoyi.system.crm.service.ICrmCustomerService;
+import com.ruoyi.system.crm.support.CrmProfileRefreshHelper;
 
 /**
  * 客户Service业务层处理
@@ -21,6 +22,9 @@ public class CrmCustomerServiceImpl implements ICrmCustomerService
 
     @Autowired
     private CrmContactMapper crmContactMapper;
+
+    @Autowired
+    private CrmProfileRefreshHelper profileRefreshHelper;
 
     @Override
     public CrmCustomer selectCrmCustomerById(Long id)
@@ -46,19 +50,25 @@ public class CrmCustomerServiceImpl implements ICrmCustomerService
         {
             customer.setCustomerNo(generateCustomerNo());
         }
-        return crmCustomerMapper.insertCrmCustomer(customer);
+        int rows = crmCustomerMapper.insertCrmCustomer(customer);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int updateCrmCustomer(CrmCustomer customer)
     {
-        return crmCustomerMapper.updateCrmCustomer(customer);
+        int rows = crmCustomerMapper.updateCrmCustomer(customer);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int deleteCrmCustomerByIds(Long[] ids)
     {
-        return crmCustomerMapper.deleteCrmCustomerByIds(ids);
+        int rows = crmCustomerMapper.deleteCrmCustomerByIds(ids);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     private String generateCustomerNo()

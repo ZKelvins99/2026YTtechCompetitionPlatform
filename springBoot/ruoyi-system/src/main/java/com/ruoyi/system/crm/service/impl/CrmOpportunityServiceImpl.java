@@ -28,6 +28,7 @@ import com.ruoyi.system.crm.mapper.CrmCustomerMapper;
 import com.ruoyi.system.crm.mapper.CrmDictMapper;
 import com.ruoyi.system.crm.mapper.CrmOpportunityMapper;
 import com.ruoyi.system.crm.service.ICrmOpportunityService;
+import com.ruoyi.system.crm.support.CrmProfileRefreshHelper;
 
 /**
  * 商机Service业务层处理
@@ -50,6 +51,9 @@ public class CrmOpportunityServiceImpl implements ICrmOpportunityService
     @Autowired
     private CrmDictMapper crmDictMapper;
 
+    @Autowired
+    private CrmProfileRefreshHelper profileRefreshHelper;
+
     @Override
     public CrmOpportunity selectCrmOpportunityById(Long id)
     {
@@ -65,19 +69,25 @@ public class CrmOpportunityServiceImpl implements ICrmOpportunityService
     @Override
     public int insertCrmOpportunity(CrmOpportunity opportunity)
     {
-        return crmOpportunityMapper.insertCrmOpportunity(opportunity);
+        int rows = crmOpportunityMapper.insertCrmOpportunity(opportunity);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int updateCrmOpportunity(CrmOpportunity opportunity)
     {
-        return crmOpportunityMapper.updateCrmOpportunity(opportunity);
+        int rows = crmOpportunityMapper.updateCrmOpportunity(opportunity);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
     public int deleteCrmOpportunityByIds(Long[] ids)
     {
-        return crmOpportunityMapper.deleteCrmOpportunityByIds(ids);
+        int rows = crmOpportunityMapper.deleteCrmOpportunityByIds(ids);
+        profileRefreshHelper.refreshCurrentUser();
+        return rows;
     }
 
     @Override
@@ -176,6 +186,10 @@ public class CrmOpportunityServiceImpl implements ICrmOpportunityService
         {
             result.addError(new CrmImportError(1, 1, "file", "Excel 解析失败：" + e.getMessage()));
             result.setFailCount(result.getFailCount() + 1);
+        }
+        if (result.getSuccessCount() > 0)
+        {
+            profileRefreshHelper.refreshCurrentUser();
         }
         return result;
     }

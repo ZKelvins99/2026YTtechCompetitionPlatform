@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmUserProfileMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmUserProfile" id="CrmUserProfileResult">
+        <result property="id" column="id"/>
+        <result property="userId" column="user_id"/>
+        <result property="customerCount" column="customer_count"/>
+        <result property="opportunityCount" column="opportunity_count"/>
+        <result property="winRate" column="win_rate"/>
+        <result property="totalAmount" column="total_amount"/>
+        <result property="industryDistribution" column="industry_distribution"/>
+        <result property="regionDistribution" column="region_distribution"/>
+        <result property="monthlyPerformance" column="monthly_performance"/>
+        <result property="updateTime" column="update_time"/>
+    </resultMap>
+
+    <select id="selectByUserId" resultMap="CrmUserProfileResult">
+        select id, user_id, customer_count, opportunity_count, win_rate, total_amount,
+               industry_distribution, region_distribution, monthly_performance, update_time
+        from crm_user_profile where user_id = #{userId}
+    </select>
+
+    <insert id="insertCrmUserProfile">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_user_profile.nextval as id from DUAL
+        </selectKey>
+        insert into crm_user_profile (
+            id, user_id, customer_count, opportunity_count, win_rate, total_amount,
+            industry_distribution, region_distribution, monthly_performance, update_time
+        ) values (
+            #{id}, #{userId}, #{customerCount}, #{opportunityCount}, #{winRate}, #{totalAmount},
+            #{industryDistribution}, #{regionDistribution}, #{monthlyPerformance}, sysdate
+        )
+    </insert>
+
+    <update id="updateCrmUserProfile">
+        update crm_user_profile
+        set customer_count = #{customerCount},
+            opportunity_count = #{opportunityCount},
+            win_rate = #{winRate},
+            total_amount = #{totalAmount},
+            industry_distribution = #{industryDistribution},
+            region_distribution = #{regionDistribution},
+            monthly_performance = #{monthlyPerformance},
+            update_time = sysdate
+        where user_id = #{userId}
+    </update>
+
+    <select id="countCustomerByCreateBy" resultType="int">
+        select count(1) from crm_customer where create_by = #{createBy}
+    </select>
+
+    <select id="countOpportunityByCreateBy" resultType="int">
+        select count(1) from crm_opportunity where create_by = #{createBy}
+    </select>
+
+    <select id="countWinOpportunityByCreateBy" resultType="int">
+        select count(1) from crm_opportunity o
+        inner join crm_opportunity_stage s on o.stage_id = s.id
+        where o.create_by = #{createBy} and s.stage_code = 'WIN'
+    </select>
+
+    <select id="sumContractAmountByCreateBy" resultType="java.math.BigDecimal">
+        select nvl(sum(contract_amount), 0) from crm_contract where create_by = #{createBy}
+    </select>
+
+    <select id="countActiveContractByCreateBy" resultType="int">
+        select count(1) from crm_contract c
+        inner join crm_contract_status s on c.status_id = s.id
+        where c.create_by = #{createBy} and s.status_code in ('ACTIVE', 'ARCHIVED')
+    </select>
+
+    <select id="countContractByCreateBy" resultType="int">
+        select count(1) from crm_contract where create_by = #{createBy}
+    </select>
+
+    <select id="countRecentOperLogByOperator" resultType="int">
+        select count(1) from crm_oper_log
+        where operator = #{operator} and operate_time &gt;= sysdate - 30
+    </select>
+
+    <select id="selectIndustryStats" resultType="map">
+        select nvl(industry, '其他') as "name", count(1) as "value"
+        from crm_customer where create_by = #{createBy}
+        group by industry order by count(1) desc
+    </select>
+
+    <select id="selectStageStats" resultType="map">
+        select s.stage_name as "name", count(1) as "value"
+        from crm_opportunity o
+        inner join crm_opportunity_stage s on o.stage_id = s.id
+        where o.create_by = #{createBy}
+        group by s.stage_name, s.sort_order
+        order by s.sort_order
+    </select>
+</mapper>

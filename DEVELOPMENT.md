@@ -1008,7 +1008,7 @@ npm install echarts-wordcloud
 | 阶段三：日志与数据可视化 | 2.3（10分） | ✅ 已完成 | 2026-05-23 | AOP日志+traceId/SQL追踪+oshi大屏+operlog查询详情 |
 | 阶段四：消息中心 | 2.4（5分） | ✅ 已完成 | 2026-05-23 | 模板CRUD+引用模板发送+撤回重发+首页Bell角标 |
 | 阶段五：海量数据加载 | 2.5（10分） | ✅ 已完成 | 2026-05-23 | @Async批量生成10万+游标无限滚动+X-Response-Time |
-| 阶段六：用户画像 | 2.6（5分） | ⬜ 待开发 | — | — |
+| 阶段六：用户画像 | 2.6（5分） | ✅ 已完成 | 2026-05-23 | 标签云+环形图+雷达图+业务CRUD联动刷新 |
 | 阶段七：工作流 | 2.7（10分） | ✅ 已完成 | 2026-05-23 | 合同4节点审批+BPMN图+6种操作 |
 | 阶段八：API 服务市场 | 2.10（5分） | ⬜ 待开发 | — | — |
 | 阶段九：工作台小组件 | 2.9（5分） | ⬜ 待开发 | — | — |
@@ -1060,6 +1060,17 @@ npm install echarts-wordcloud
 | 前端 API | `web/src/api/crm/behavior.js` |
 | 前端页面 | `web/src/views/crm/behavior/index.vue` |
 
+### 阶段六交付物清单
+
+| 类型 | 路径 |
+|---|---|
+| 建表 | `crm_user_profile` 已在 `SQL/01_init_tables.sql` |
+| 后端 Service | `CrmUserProfileServiceImpl.java` + `CrmProfileRefreshHelper.java` |
+| 后端 Controller | `CrmUserProfileController.java` |
+| SQL 菜单 | `SQL/08_crm_profile_menu.sql` |
+| 前端 API | `web/src/api/crm/profile.js` |
+| 前端页面 | `web/src/views/crm/dashboard/profile.vue` |
+
 ### 启动前需执行的 SQL（按顺序）
 
 1. 若依基础库（已有则跳过）：`springBoot/sql/ry_20260417.sql`
@@ -1070,3 +1081,4 @@ npm install echarts-wordcloud
 6. 大屏/操作日志菜单：`SQL/05_crm_dashboard_operlog_menu.sql`
 7. 消息中心菜单：`SQL/06_crm_message_menu.sql`
 8. 海量行为数据菜单：`SQL/07_crm_behavior_menu.sql`
+9. 用户画像菜单：`SQL/08_crm_profile_menu.sql`
