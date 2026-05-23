@@ -670,56 +670,29 @@ web/src/
 
 ### 阶段七：工作流功能（对应 2.7，得分目标：10分）
 
+> **状态：✅ 已完成**（2026-05-23）  
+> **简介**：实现合同 CRUD、4 节点审批流程（提交→部门审批→财务审批→归档）、6 种审批操作（通过/驳回/会签/转办/回退/终止）、BPMN 流程图可视化（bpmn-js 节点染色）、审批历史时间线，终审通过后合同状态自动更新为已生效。
+
 #### 后端任务
 
-1. 工作流接口 `/crm/workflow`：
-   - `POST /start` — 发起合同审批：
-     - 创建 `CRM_WORKFLOW_INSTANCE` 记录
-     - 预置 4 个节点（NODE_ORDER 1~4）：提交、部门审批、财务审批、归档
-     - 第一个节点状态 = '0'（待审批），其余 = '0'（创建）
-   - `PUT /approve` — 审批通过：当前节点 → 已通过，激活下一节点
-   - `PUT /reject` — 驳回：当前节点 → 驳回，回退到上一节点
-   - `PUT /countersign` — 会签：同一节点新增多个审批人记录，全部通过才流转
-   - `PUT /transfer` — 转办：修改当前节点的 `APPROVER_ID`
-   - `PUT /rollback/{targetNodeId}` — 指定回退到任意历史节点
-   - `PUT /terminate` — 终止：流程实例状态 → '2'（已终止）
-   - `GET /instance/{id}` — 查询流程实例（含全部节点、状态、审批意见）
-   - `GET /instance/{id}/bpmn` — 返回 BPMN 2.0 XML 字符串，供前端渲染
-2. 状态机校验（Service 层）：每个操作前校验当前状态是否允许
-3. 合同状态联动：审批通过最终节点 → 合同状态自动更新为 "已生效"
+- [x] 1. `/crm/workflow` 全套接口（start/approve/reject/countersign/transfer/rollback/terminate/instance/bpmn）
+- [x] 2. Service 层状态机校验
+- [x] 3. 终审通过 → 合同状态 ACTIVE
 
 #### 前端任务
 
-1. 安装 bpmn-js：
-   ```bash
-   cd web && npm install bpmn-js
-   ```
-2. 新增 `web/src/views/crm/contract/index.vue`（合同列表）：
-   - 基础 CRUD + 操作列「发起审批」按钮（仅 `statusCode === 'DRAFT'` 可见）
-   - 点击发起审批 → 调用 `/workflow/start` → 刷新列表
-3. 新增 `web/src/views/crm/workflow/index.vue`（审批流程）：
-   - **上半部分** — BPMN 流程图：
-     - 使用 `bpmn-js` 的 `BpmnViewer` 渲染 XML
-     - 节点染色覆盖：已通过 → `#67C23A`（绿），当前 → `#409EFF`（蓝），未到达 → `#DCDFE6`（灰），驳回 → `#F56C6C`（红）
-   - **下半部分** — 审批操作区：
-     - `<el-input type="textarea">` 审批意见
-     - 操作按钮组：
-       - `<el-button type="success">` 通过
-       - `<el-button type="danger">` 驳回
-       - `<el-button>` 会签（弹出选择审批人对话框）
-       - `<el-button>` 转办（弹出选择转办人对话框）
-       - `<el-button>` 回退（下拉选择目标节点）
-       - `<el-button type="danger">` 终止
-   - **下方** — 审批历史时间线（`<el-timeline>` + `<el-timeline-item>`），展示：节点名称、审批人、操作类型、意见、时间
-4. 新增 `web/src/api/crm/workflow.js`
+- [x] 1. 安装 bpmn-js
+- [x] 2. `crm/contract/index.vue` — CRUD + 发起审批
+- [x] 3. `crm/workflow/index.vue` — BPMN 图 + 操作区 + 时间线
+- [x] 4. `web/src/api/crm/workflow.js`
 
 #### 得分覆盖
 
-| 得分点 | 分值 | 实现方式 |
-|---|---|---|
-| 4个审批节点 + 完整流转 | 4分 | 提交→部门审批→财务审批→归档 串联 |
-| 审批/驳回/会签/指定回退/转办/终止 | 4分 | 6 种操作接口 + 状态机校验 |
-| BPMN 流程图可视化 | 2分 | bpmn-js `BpmnViewer` + 节点颜色高亮 |
+| 得分点 | 分值 | 状态 | 实现方式 |
+|---|---|---|---|
+| 4节点完整流转 | 4分 | ✅ | 提交→部门→财务→归档 |
+| 6种审批操作 | 4分 | ✅ | 6 个 PUT 接口 + 状态校验 |
+| BPMN 可视化 | 2分 | ✅ | bpmn-js BpmnViewer + 节点染色 |
 
 ---
 
@@ -1036,7 +1009,7 @@ npm install echarts-wordcloud
 | 阶段四：消息中心 | 2.4（5分） | ⬜ 待开发 | — | — |
 | 阶段五：海量数据加载 | 2.5（10分） | ⬜ 待开发 | — | — |
 | 阶段六：用户画像 | 2.6（5分） | ⬜ 待开发 | — | — |
-| 阶段七：工作流 | 2.7（10分） | ⬜ 待开发 | — | — |
+| 阶段七：工作流 | 2.7（10分） | ✅ 已完成 | 2026-05-23 | 合同4节点审批+BPMN图+6种操作 |
 | 阶段八：API 服务市场 | 2.10（5分） | ⬜ 待开发 | — | — |
 | 阶段九：工作台小组件 | 2.9（5分） | ⬜ 待开发 | — | — |
 | 浏览器插件 | 2.8（5分） | ⬜ 待开发 | — | — |
@@ -1059,3 +1032,4 @@ npm install echarts-wordcloud
 2. CRM 建表：`SQL/01_init_tables.sql`
 3. CRM 菜单：`SQL/02_crm_menu.sql`
 4. 商机菜单：`SQL/03_crm_opportunity_menu.sql`
+5. 合同/工作流菜单：`SQL/04_crm_contract_workflow_menu.sql`

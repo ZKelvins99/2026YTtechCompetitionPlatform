@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.crm.mapper.CrmWorkflowMapper">
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmWorkflowInstance" id="InstanceResult">
+        <result property="id" column="id"/>
+        <result property="processType" column="process_type"/>
+        <result property="businessId" column="business_id"/>
+        <result property="businessNo" column="business_no"/>
+        <result property="currentNodeId" column="current_node_id"/>
+        <result property="status" column="status"/>
+        <result property="startUserId" column="start_user_id"/>
+        <result property="startUserName" column="start_user_name"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+    </resultMap>
+
+    <resultMap type="com.ruoyi.system.crm.domain.CrmWorkflowNode" id="NodeResult">
+        <result property="id" column="id"/>
+        <result property="instanceId" column="instance_id"/>
+        <result property="nodeName" column="node_name"/>
+        <result property="nodeOrder" column="node_order"/>
+        <result property="approverId" column="approver_id"/>
+        <result property="approverName" column="approver_name"/>
+        <result property="approvalType" column="approval_type"/>
+        <result property="status" column="status"/>
+        <result property="opinion" column="opinion"/>
+        <result property="approveTime" column="approve_time"/>
+    </resultMap>
+
+    <select id="selectInstanceById" resultMap="InstanceResult">
+        select i.id, i.process_type, i.business_id, i.business_no, i.current_node_id, i.status,
+               i.start_user_id, u.nick_name as start_user_name, i.start_time, i.end_time
+        from crm_workflow_instance i
+        left join sys_user u on i.start_user_id = u.user_id
+        where i.id = #{id}
+    </select>
+
+    <select id="selectActiveInstanceByBusinessId" resultMap="InstanceResult">
+        select id, process_type, business_id, business_no, current_node_id, status,
+               start_user_id, start_time, end_time
+        from crm_workflow_instance
+        where business_id = #{businessId} and status = '0'
+    </select>
+
+    <select id="selectNodesByInstanceId" resultMap="NodeResult">
+        select n.id, n.instance_id, n.node_name, n.node_order, n.approver_id,
+               u.nick_name as approver_name, n.approval_type, n.status, n.opinion, n.approve_time
+        from crm_workflow_node n
+        left join sys_user u on n.approver_id = u.user_id
+        where n.instance_id = #{instanceId}
+        order by n.node_order, n.id
+    </select>
+
+    <select id="selectNodeById" resultMap="NodeResult">
+        select n.id, n.instance_id, n.node_name, n.node_order, n.approver_id,
+               u.nick_name as approver_name, n.approval_type, n.status, n.opinion, n.approve_time
+        from crm_workflow_node n
+        left join sys_user u on n.approver_id = u.user_id
+        where n.id = #{id}
+    </select>
+
+    <insert id="insertInstance" parameterType="com.ruoyi.system.crm.domain.CrmWorkflowInstance">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_workflow_instance.nextval as id from DUAL
+        </selectKey>
+        insert into crm_workflow_instance (
+            id, process_type, business_id, business_no, current_node_id, status, start_user_id, start_time
+        ) values (
+            #{id}, #{processType}, #{businessId}, #{businessNo}, #{currentNodeId}, #{status}, #{startUserId}, sysdate
+        )
+    </insert>
+
+    <update id="updateInstance" parameterType="com.ruoyi.system.crm.domain.CrmWorkflowInstance">
+        update crm_workflow_instance
+        <set>
+            <if test="currentNodeId != null">current_node_id = #{currentNodeId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="endTime != null">end_time = #{endTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <insert id="insertNode" parameterType="com.ruoyi.system.crm.domain.CrmWorkflowNode">
+        <selectKey keyProperty="id" order="BEFORE" resultType="long">
+            select seq_crm_workflow_node.nextval as id from DUAL
+        </selectKey>
+        insert into crm_workflow_node (
+            id, instance_id, node_name, node_order, approver_id, approval_type, status, opinion, approve_time
+        ) values (
+            #{id}, #{instanceId}, #{nodeName}, #{nodeOrder}, #{approverId}, #{approvalType}, #{status},
+            #{opinion}, #{approveTime}
+        )
+    </insert>
+
+    <update id="updateNode" parameterType="com.ruoyi.system.crm.domain.CrmWorkflowNode">
+        update crm_workflow_node
+        <set>
+            <if test="approverId != null">approver_id = #{approverId},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="opinion != null">opinion = #{opinion},</if>
+            <if test="approveTime != null">approve_time = #{approveTime},</if>
+        </set>
+        where id = #{id}
+    </update>
+
+    <update id="resetNodesFromOrder">
+        update crm_workflow_node set status = '0', opinion = null, approve_time = null
+        where instance_id = #{instanceId} and node_order >= #{nodeOrder}
+    </update>
+
+</mapper>

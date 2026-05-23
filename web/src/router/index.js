@@ -151,16 +151,16 @@ export const dynamicRoutes = [
     ]
   },
   {
-    path: '/tool/gen-edit',
+    path: '/crm/workflow',
     component: Layout,
     hidden: true,
-    permissions: ['tool:gen:edit'],
+    permissions: ['crm:workflow:query'],
     children: [
       {
-        path: 'index/:tableId(\\d+)',
-        component: () => import('@/views/tool/gen/editTable'),
-        name: 'GenEdit',
-        meta: { title: '修改生成配置', activeMenu: '/tool/gen' }
+        path: 'index/:instanceId(\\d+)',
+        component: () => import('@/views/crm/workflow/index'),
+        name: 'CrmWorkflow',
+        meta: { title: '审批流程', activeMenu: '/crm/contract' }
       }
     ]
   }
