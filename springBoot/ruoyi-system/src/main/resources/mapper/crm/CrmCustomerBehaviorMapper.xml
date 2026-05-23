@@ -11,11 +11,16 @@
         <result property="createTime" column="create_time"/>
     </resultMap>
 
+    <!-- Oracle INSERT ALL 中多次 nextval 只会递增一次，需 Java 侧预分配 id -->
+    <select id="selectNextIds" resultType="long">
+        SELECT seq_crm_customer_behavior.NEXTVAL FROM dual CONNECT BY LEVEL &lt;= #{count}
+    </select>
+
     <insert id="batchInsert">
         INSERT ALL
         <foreach collection="list" item="item">
             INTO crm_customer_behavior (id, customer_id, behavior_type, description, behavior_time, create_time)
-            VALUES (seq_crm_customer_behavior.nextval, #{item.customerId}, #{item.behaviorType}, #{item.description}, #{item.behaviorTime}, sysdate)
+            VALUES (#{item.id}, #{item.customerId}, #{item.behaviorType}, #{item.description}, #{item.behaviorTime}, sysdate)
         </foreach>
         SELECT 1 FROM DUAL
     </insert>
@@ -32,4 +37,8 @@
     <select id="countTotal" resultType="long">
         select count(1) from crm_customer_behavior
     </select>
+
+    <delete id="deleteAll">
+        delete from crm_customer_behavior
+    </delete>
 </mapper>

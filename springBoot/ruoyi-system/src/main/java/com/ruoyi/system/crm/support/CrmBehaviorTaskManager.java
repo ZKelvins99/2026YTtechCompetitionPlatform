@@ -26,6 +26,15 @@ public class CrmBehaviorTaskManager
         }
     }
 
+    public void updateTotal(String taskId, int total)
+    {
+        CrmBehaviorTaskStatus task = tasks.get(taskId);
+        if (task != null)
+        {
+            task.setTotal(total);
+        }
+    }
+
     public void markDone(String taskId)
     {
         CrmBehaviorTaskStatus task = tasks.get(taskId);

@@ -67,7 +67,8 @@
         insert into crm_workflow_instance (
             id, process_type, business_id, business_no, current_node_id, status, start_user_id, start_time
         ) values (
-            #{id}, #{processType}, #{businessId}, #{businessNo}, #{currentNodeId}, #{status}, #{startUserId}, sysdate
+            #{id}, #{processType}, #{businessId}, #{businessNo}, #{currentNodeId,jdbcType=NUMERIC},
+            #{status}, #{startUserId}, sysdate
         )
     </insert>
 
@@ -88,8 +89,8 @@
         insert into crm_workflow_node (
             id, instance_id, node_name, node_order, approver_id, approval_type, status, opinion, approve_time
         ) values (
-            #{id}, #{instanceId}, #{nodeName}, #{nodeOrder}, #{approverId}, #{approvalType}, #{status},
-            #{opinion}, #{approveTime}
+            #{id}, #{instanceId}, #{nodeName}, #{nodeOrder}, #{approverId,jdbcType=NUMERIC}, #{approvalType}, #{status},
+            #{opinion,jdbcType=VARCHAR}, #{approveTime,jdbcType=TIMESTAMP}
         )
     </insert>
 

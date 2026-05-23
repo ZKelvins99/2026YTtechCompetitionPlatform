@@ -70,8 +70,9 @@
             id, contract_no, contract_name, customer_id, opportunity_id, contract_amount,
             status_id, sign_date, start_date, end_date, content, create_by, create_time
         ) values (
-            #{id}, #{contractNo}, #{contractName}, #{customerId}, #{opportunityId}, #{contractAmount},
-            #{statusId}, #{signDate}, #{startDate}, #{endDate}, #{content}, #{createBy}, sysdate
+            #{id}, #{contractNo}, #{contractName}, #{customerId}, #{opportunityId,jdbcType=NUMERIC}, #{contractAmount},
+            #{statusId}, #{signDate,jdbcType=DATE}, #{startDate,jdbcType=DATE}, #{endDate,jdbcType=DATE},
+            #{content,jdbcType=CLOB}, #{createBy}, sysdate
         )
     </insert>
 

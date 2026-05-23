@@ -10,31 +10,42 @@
 
     <el-row :gutter="10" class="mb8">
       <el-col :span="1.5">
-        <el-button type="primary" icon="Upload" @click="openGenerate = true" v-hasPermi="['crm:behavior:generate']">生成数据</el-button>
+        <el-button type="primary" icon="Upload" @click="openImport = true" v-hasPermi="['crm:behavior:import']">Excel 导入</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="info" plain icon="Download" @click="downloadTemplate">下载模板</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="warning" plain icon="Download" :loading="downloadingSample" @click="downloadSample" v-hasPermi="['crm:behavior:import']">下载10万样例</el-button>
+      </el-col>
+      <el-col :span="1.5">
+        <el-button type="danger" plain icon="Delete" @click="handleClear" v-hasPermi="['crm:behavior:remove']">一键清空</el-button>
       </el-col>
       <el-col :span="1.5">
         <el-button icon="Refresh" @click="reloadList">刷新列表</el-button>
       </el-col>
     </el-row>
 
-    <el-dialog title="批量生成行为数据" v-model="openGenerate" width="420px" append-to-body :close-on-click-modal="!generating">
-      <el-form label-width="100px">
-        <el-form-item label="生成数量">
-          <el-input-number v-model="generateCount" :min="1000" :max="500000" :step="10000" style="width: 100%" />
-        </el-form-item>
-        <el-form-item v-if="generating || taskStatus">
-          <el-progress :percentage="progressPercent" :status="progressStatus" />
-          <div class="progress-text" v-if="taskStatus">
-            {{ taskStatus.processed }} / {{ taskStatus.total }}
-            <span v-if="taskStatus.status === 'RUNNING'">（生成中…）</span>
-            <span v-else-if="taskStatus.status === 'DONE'" class="text-success">（完成）</span>
-            <span v-else class="text-danger">（失败：{{ taskStatus.message }}）</span>
-          </div>
-        </el-form-item>
-      </el-form>
+    <el-dialog title="Excel 批量导入行为数据" v-model="openImport" width="520px" append-to-body :close-on-click-modal="!importing">
+      <el-upload drag :auto-upload="false" :limit="1" accept=".xlsx,.xls" :on-change="onFileChange" :on-remove="() => selectedFile = null">
+        <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <template #tip>
+          <div class="el-upload__tip">支持 xls/xlsx，建议 10 万级以上数据使用本功能异步导入</div>
+        </template>
+      </el-upload>
+      <el-form-item v-if="importing || taskStatus" label-width="0" style="margin-top: 16px">
+        <el-progress :percentage="progressPercent" :status="progressStatus" />
+        <div class="progress-text" v-if="taskStatus">
+          {{ taskStatus.processed }} / {{ taskStatus.total || '统计中…' }}
+          <span v-if="taskStatus.status === 'RUNNING'">（导入中…）</span>
+          <span v-else-if="taskStatus.status === 'DONE'" class="text-success">（完成）</span>
+          <span v-else class="text-danger">（失败：{{ taskStatus.message }}）</span>
+        </div>
+      </el-form-item>
       <template #footer>
-        <el-button @click="closeGenerateDialog" :disabled="generating && taskStatus?.status === 'RUNNING'">关闭</el-button>
-        <el-button type="primary" :loading="generating" @click="startGenerate" v-hasPermi="['crm:behavior:generate']">开始生成</el-button>
+        <el-button @click="closeImportDialog" :disabled="importing && taskStatus?.status === 'RUNNING'">关闭</el-button>
+        <el-button type="primary" :loading="importing" @click="startImport" v-hasPermi="['crm:behavior:import']">开始导入</el-button>
       </template>
     </el-dialog>
 
@@ -59,9 +70,11 @@
 </template>
 
 <script setup name="CrmBehavior">
-import { Loading } from '@element-plus/icons-vue'
+import { Loading, UploadFilled } from '@element-plus/icons-vue'
 import { useScroll } from '@vueuse/core'
-import { generateBehavior, getBehaviorTask, scrollBehavior } from '@/api/crm/behavior'
+import { clearBehaviorData, getBehaviorTask, importBehaviorExcel, scrollBehavior } from '@/api/crm/behavior'
+
+const { proxy } = getCurrentInstance()
 
 const containerRef = ref(null)
 const list = ref([])
@@ -72,9 +85,10 @@ const loadingMore = ref(false)
 const initialLoading = ref(false)
 const responseTime = ref(null)
 
-const openGenerate = ref(false)
-const generateCount = ref(100000)
-const generating = ref(false)
+const openImport = ref(false)
+const selectedFile = ref(null)
+const importing = ref(false)
+const downloadingSample = ref(false)
 const taskStatus = ref(null)
 let pollTimer = null
 
@@ -129,28 +143,53 @@ function reloadList() {
   loadMore(true)
 }
 
-function startGenerate() {
-  generating.value = true
+function onFileChange(uploadFile) {
+  selectedFile.value = uploadFile.raw
+}
+
+function downloadTemplate() {
+  proxy.download('crm/behavior/importTemplate', {}, `behavior_template_${Date.now()}.xlsx`)
+}
+
+function downloadSample() {
+  downloadingSample.value = true
+  proxy.download('crm/behavior/sampleExcel', { count: 100000 }, `behavior_sample_100000.xlsx`).finally(() => {
+    downloadingSample.value = false
+  })
+}
+
+function startImport() {
+  if (!selectedFile.value) {
+    proxy.$modal.msgError('请选择 Excel 文件')
+    return
+  }
+  importing.value = true
   taskStatus.value = null
-  generateBehavior(generateCount.value).then(res => {
-    const taskId = res.data.taskId
-    pollTimer = setInterval(() => {
-      getBehaviorTask(taskId).then(r => {
-        taskStatus.value = r.data
-        if (r.data.status === 'DONE') {
-          stopPoll()
-          generating.value = false
-          reloadList()
-        } else if (r.data.status === 'FAILED') {
-          stopPoll()
-          generating.value = false
-        }
-      }).catch(() => {
+  const formData = new FormData()
+  formData.append('file', selectedFile.value)
+  importBehaviorExcel(formData).then(res => {
+  pollTask(res.data.taskId)
+  }).catch(() => { importing.value = false })
+}
+
+function pollTask(taskId) {
+  pollTimer = setInterval(() => {
+    getBehaviorTask(taskId).then(r => {
+      taskStatus.value = r.data
+      if (r.data.status === 'DONE') {
         stopPoll()
-        generating.value = false
-      })
-    }, 1000)
-  }).catch(() => { generating.value = false })
+        importing.value = false
+        proxy.$modal.msgSuccess(`成功导入 ${r.data.processed} 条数据`)
+        reloadList()
+      } else if (r.data.status === 'FAILED') {
+        stopPoll()
+        importing.value = false
+      }
+    }).catch(() => {
+      stopPoll()
+      importing.value = false
+    })
+  }, 1000)
 }
 
 function stopPoll() {
@@ -160,10 +199,20 @@ function stopPoll() {
   }
 }
 
-function closeGenerateDialog() {
-  if (generating.value && taskStatus.value?.status === 'RUNNING') return
-  openGenerate.value = false
+function closeImportDialog() {
+  if (importing.value && taskStatus.value?.status === 'RUNNING') return
+  openImport.value = false
+  selectedFile.value = null
   stopPoll()
+}
+
+function handleClear() {
+  proxy.$modal.confirm('确认清空全部客户行为数据？此操作不可恢复。').then(() => {
+    return clearBehaviorData()
+  }).then(res => {
+    proxy.$modal.msgSuccess(`已清空 ${res.data} 条数据`)
+    reloadList()
+  }).catch(() => {})
 }
 
 watch(() => arrivedState.bottom, (v) => {

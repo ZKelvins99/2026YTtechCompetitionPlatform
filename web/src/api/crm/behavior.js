@@ -4,6 +4,17 @@ import request from '@/utils/request'
 
 const baseURL = import.meta.env.VITE_APP_BASE_API
 
+/** 异步 Excel 导入，返回 taskId */
+export function importBehaviorExcel(formData) {
+  return request({
+    url: '/crm/behavior/import',
+    method: 'post',
+    data: formData,
+    headers: { 'Content-Type': 'multipart/form-data', repeatSubmit: false },
+    timeout: 300000
+  })
+}
+
 export function generateBehavior(count) {
   return request({
     url: '/crm/behavior/generate',
@@ -17,6 +28,13 @@ export function getBehaviorTask(taskId) {
   return request({
     url: '/crm/behavior/task/' + taskId,
     method: 'get'
+  })
+}
+
+export function clearBehaviorData() {
+  return request({
+    url: '/crm/behavior/clear',
+    method: 'delete'
   })
 }
 

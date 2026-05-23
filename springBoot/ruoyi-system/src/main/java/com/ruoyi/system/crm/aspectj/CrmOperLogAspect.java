@@ -103,7 +103,7 @@ public class CrmOperLogAspect
                     filtered[i] = arg;
                 }
             }
-            return JSON.toJSONString(filtered, new PropertyPreExcludeFilter(new String[] { "password" }));
+            return JSON.toJSONString(filtered, new PropertyPreExcludeFilter().addExcludes("password"));
         }
         catch (Exception e)
         {

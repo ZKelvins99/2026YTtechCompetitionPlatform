@@ -81,7 +81,7 @@
         select * from (
             select operator as "name", count(1) as "value" from crm_oper_log
             where trunc(operate_time) = trunc(sysdate) and operator is not null
-            group by operator order by value desc
+            group by operator order by count(1) desc
         ) where rownum &lt;= 5
     </select>
 
