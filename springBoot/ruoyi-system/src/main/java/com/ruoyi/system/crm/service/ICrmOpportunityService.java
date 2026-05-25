@@ -21,4 +21,9 @@ public interface ICrmOpportunityService
     int deleteCrmOpportunityByIds(Long[] ids);
 
     CrmImportResult importOpportunity(InputStream inputStream, String operName);
+
+    /**
+     * 为 Excel 导入样例创建测试客户（已存在则跳过）
+     */
+    String seedImportTestCustomers(String operName);
 }

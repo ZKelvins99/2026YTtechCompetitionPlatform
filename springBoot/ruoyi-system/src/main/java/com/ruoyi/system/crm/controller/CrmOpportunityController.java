@@ -91,4 +91,12 @@ public class CrmOpportunityController extends BaseController
         ExcelUtil<CrmOpportunityImportTemplate> util = new ExcelUtil<>(CrmOpportunityImportTemplate.class);
         util.importTemplateExcel(response, "商机导入模板");
     }
+
+    @PreAuthorize("@ss.hasPermi('crm:opportunity:import')")
+    @Log(title = "商机管理", businessType = BusinessType.INSERT)
+    @PostMapping("/seedImportCustomers")
+    public AjaxResult seedImportCustomers()
+    {
+        return AjaxResult.success(crmOpportunityService.seedImportTestCustomers(getUsername()));
+    }
 }

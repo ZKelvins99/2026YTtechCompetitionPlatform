@@ -19,6 +19,7 @@ import com.ruoyi.system.crm.domain.CrmApiInfo;
 import com.ruoyi.system.crm.mapper.CrmApiInfoMapper;
 import com.ruoyi.system.crm.mapper.CrmCustomerMapper;
 import com.ruoyi.system.crm.service.ICrmApiInfoService;
+import com.ruoyi.system.crm.support.CrmApiMarketGuard;
 
 @Service
 public class CrmApiInfoServiceImpl implements ICrmApiInfoService
@@ -31,6 +32,9 @@ public class CrmApiInfoServiceImpl implements ICrmApiInfoService
 
     @Autowired
     private RestTemplate crmRestTemplate;
+
+    @Autowired
+    private CrmApiMarketGuard crmApiMarketGuard;
 
     @Value("${server.port:8080}")
     private int serverPort;
@@ -53,6 +57,7 @@ public class CrmApiInfoServiceImpl implements ICrmApiInfoService
     @Override
     public int insertCrmApiInfo(CrmApiInfo apiInfo)
     {
+        normalizeApiInfo(apiInfo);
         if (StringUtils.isEmpty(apiInfo.getStatus()))
         {
             apiInfo.setStatus("1");
@@ -63,7 +68,21 @@ public class CrmApiInfoServiceImpl implements ICrmApiInfoService
     @Override
     public int updateCrmApiInfo(CrmApiInfo apiInfo)
     {
+        normalizeApiInfo(apiInfo);
         return crmApiInfoMapper.updateCrmApiInfo(apiInfo);
+    }
+
+    private void normalizeApiInfo(CrmApiInfo apiInfo)
+    {
+        if (apiInfo == null)
+        {
+            return;
+        }
+        apiInfo.setApiUrl(CrmApiMarketGuard.normalizeApiUrl(apiInfo.getApiUrl()));
+        if (StringUtils.isNotEmpty(apiInfo.getApiMethod()))
+        {
+            apiInfo.setApiMethod(apiInfo.getApiMethod().trim().toUpperCase());
+        }
     }
 
     @Override
@@ -92,9 +111,9 @@ public class CrmApiInfoServiceImpl implements ICrmApiInfoService
         {
             throw new ServiceException("API 不存在");
         }
-        if (!"1".equals(apiInfo.getStatus()))
+        if (crmApiMarketGuard.isOffline(apiInfo.getId()))
         {
-            throw new ServiceException("接口已下架");
+            throw new ServiceException(CrmApiMarketGuard.OFFLINE_MESSAGE);
         }
 
         String targetUrl = resolveUrl(apiInfo.getApiUrl());

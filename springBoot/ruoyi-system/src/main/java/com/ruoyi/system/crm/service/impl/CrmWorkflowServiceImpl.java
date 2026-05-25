@@ -1,17 +1,23 @@
 package com.ruoyi.system.crm.service.impl;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StreamUtils;
 import org.springframework.transaction.annotation.Transactional;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.crm.domain.CrmContract;
 import com.ruoyi.system.crm.domain.CrmWorkflowActionRequest;
 import com.ruoyi.system.crm.domain.CrmWorkflowInstance;
 import com.ruoyi.system.crm.domain.CrmWorkflowNode;
+import com.ruoyi.system.crm.domain.CrmWorkflowStartRequest;
 import com.ruoyi.system.crm.mapper.CrmContractMapper;
 import com.ruoyi.system.crm.mapper.CrmWorkflowMapper;
 import com.ruoyi.system.crm.service.ICrmWorkflowService;
@@ -30,8 +36,19 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
 
     @Override
     @Transactional
-    public CrmWorkflowInstance startContractApproval(Long contractId, Long userId)
+    public CrmWorkflowInstance startContractApproval(CrmWorkflowStartRequest request, Long userId)
     {
+        if (request == null || request.getContractId() == null)
+        {
+            throw new ServiceException("合同ID不能为空");
+        }
+        Long contractId = request.getContractId();
+        if (request.getDeptApproverId() == null || request.getFinanceApproverId() == null
+            || request.getArchiveApproverId() == null)
+        {
+            throw new ServiceException("请指定部门、财务、归档审批人");
+        }
+
         CrmContract contract = contractMapper.selectCrmContractById(contractId);
         if (contract == null)
         {
@@ -54,7 +71,9 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         instance.setStartUserId(userId);
         workflowMapper.insertInstance(instance);
 
-        Long firstNodeId = null;
+        Long[] approvers = { userId, request.getDeptApproverId(), request.getFinanceApproverId(),
+            request.getArchiveApproverId() };
+        CrmWorkflowNode deptNode = null;
         for (int i = 0; i < NODE_NAMES.length; i++)
         {
             CrmWorkflowNode node = new CrmWorkflowNode();
@@ -62,29 +81,35 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             node.setNodeName(NODE_NAMES[i]);
             node.setNodeOrder(i + 1);
             node.setApprovalType("SINGLE");
-            node.setStatus("0");
+            node.setApproverId(approvers[i]);
             if (i == 0)
             {
-                node.setApproverId(userId);
+                node.setStatus("1");
+                node.setOpinion("提交");
+                node.setApproveTime(new Date());
+            }
+            else
+            {
+                node.setStatus("0");
             }
             workflowMapper.insertNode(node);
-            if (i == 0)
+            if (i == 1)
             {
-                firstNodeId = node.getId();
+                deptNode = node;
             }
         }
 
-        instance.setCurrentNodeId(firstNodeId);
+        instance.setCurrentNodeId(deptNode.getId());
         workflowMapper.updateInstance(instance);
 
         Long approvingId = contractMapper.selectStatusIdByCode("APPROVING");
         contractMapper.updateContractStatus(contractId, approvingId);
 
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     @Override
-    public CrmWorkflowInstance getInstanceDetail(Long instanceId)
+    public CrmWorkflowInstance getInstanceDetail(Long instanceId, Long userId)
     {
         CrmWorkflowInstance instance = workflowMapper.selectInstanceById(instanceId);
         if (instance == null)
@@ -100,13 +125,18 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             }
         }
         instance.setNodes(nodes);
+        instance.setCanOperate(resolveCanOperate(instance, userId));
+        instance.setBpmnXml(BPMN_TEMPLATE);
         return instance;
     }
 
     @Override
     public String getBpmnXml(Long instanceId)
     {
-        getInstanceDetail(instanceId);
+        if (workflowMapper.selectInstanceById(instanceId) == null)
+        {
+            throw new ServiceException("流程实例不存在");
+        }
         return BPMN_TEMPLATE;
     }
 
@@ -116,7 +146,8 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
         CrmWorkflowNode current = getCurrentNode(instance);
-        validateNodeOperable(current);
+        assertCanApprove(current, userId);
+        fillApproverIfMissing(current, userId);
 
         current.setStatus("1");
         current.setOpinion(request.getOpinion());
@@ -125,7 +156,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
 
         if (!isCurrentOrderAllApproved(instance.getId(), current.getNodeOrder()))
         {
-            return getInstanceDetail(instance.getId());
+            return getInstanceDetail(instance.getId(), userId);
         }
 
         CrmWorkflowNode next = findPrimaryNodeByOrder(instance.getId(), current.getNodeOrder() + 1);
@@ -140,7 +171,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             contractMapper.updateContractStatus(instance.getBusinessId(),
                 contractMapper.selectStatusIdByCode("ACTIVE"));
         }
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     @Override
@@ -149,7 +180,8 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
         CrmWorkflowNode current = getCurrentNode(instance);
-        validateNodeOperable(current);
+        assertCanApprove(current, userId);
+        fillApproverIfMissing(current, userId);
 
         current.setStatus("2");
         current.setOpinion(request.getOpinion());
@@ -165,7 +197,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         workflowMapper.resetNodesFromOrder(instance.getId(), prev.getNodeOrder());
         instance.setCurrentNodeId(prev.getId());
         workflowMapper.updateInstance(instance);
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     @Override
@@ -174,7 +206,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
         CrmWorkflowNode current = getCurrentNode(instance);
-        validateNodeOperable(current);
+        assertCanApprove(current, userId);
 
         if (request.getCountersignUserIds() == null || request.getCountersignUserIds().isEmpty())
         {
@@ -194,7 +226,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         }
         current.setApprovalType("COUNTERSIGN");
         workflowMapper.updateNode(current);
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     @Override
@@ -203,7 +235,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
         CrmWorkflowNode current = getCurrentNode(instance);
-        validateNodeOperable(current);
+        assertCanApprove(current, userId);
 
         if (request.getApproverId() == null)
         {
@@ -226,7 +258,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         workflowMapper.insertNode(newNode);
         instance.setCurrentNodeId(newNode.getId());
         workflowMapper.updateInstance(instance);
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     @Override
@@ -241,6 +273,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         }
 
         CrmWorkflowNode current = getCurrentNode(instance);
+        assertCanApprove(current, userId);
         current.setStatus("4");
         current.setOpinion(opinion);
         current.setApproveTime(new Date());
@@ -249,7 +282,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         workflowMapper.resetNodesFromOrder(instanceId, target.getNodeOrder());
         instance.setCurrentNodeId(target.getId());
         workflowMapper.updateInstance(instance);
-        return getInstanceDetail(instanceId);
+        return getInstanceDetail(instanceId, userId);
     }
 
     @Override
@@ -258,6 +291,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
         CrmWorkflowNode current = getCurrentNode(instance);
+        assertCanApprove(current, userId);
         current.setStatus("2");
         current.setOpinion(StringUtils.defaultString(request.getOpinion(), "流程终止"));
         current.setApproveTime(new Date());
@@ -269,7 +303,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
 
         contractMapper.updateContractStatus(instance.getBusinessId(),
             contractMapper.selectStatusIdByCode("TERMINATED"));
-        return getInstanceDetail(instance.getId());
+        return getInstanceDetail(instance.getId(), userId);
     }
 
     private CrmWorkflowInstance loadRunningInstance(Long instanceId)
@@ -296,12 +330,46 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         return node;
     }
 
-    private void validateNodeOperable(CrmWorkflowNode node)
+    private void assertCanApprove(CrmWorkflowNode node, Long userId)
     {
         if (!"0".equals(node.getStatus()))
         {
             throw new ServiceException("当前节点不可操作");
         }
+        if (SecurityUtils.isAdmin(userId))
+        {
+            return;
+        }
+        if (node.getApproverId() == null || !node.getApproverId().equals(userId))
+        {
+            throw new ServiceException("您不是当前节点审批人，无权操作");
+        }
+    }
+
+    private void fillApproverIfMissing(CrmWorkflowNode node, Long userId)
+    {
+        if (node.getApproverId() == null && userId != null)
+        {
+            node.setApproverId(userId);
+        }
+    }
+
+    private boolean resolveCanOperate(CrmWorkflowInstance instance, Long userId)
+    {
+        if (!"0".equals(instance.getStatus()) || instance.getCurrentNodeId() == null)
+        {
+            return false;
+        }
+        CrmWorkflowNode current = workflowMapper.selectNodeById(instance.getCurrentNodeId());
+        if (current == null || !"0".equals(current.getStatus()))
+        {
+            return false;
+        }
+        if (SecurityUtils.isAdmin(userId))
+        {
+            return true;
+        }
+        return userId != null && userId.equals(current.getApproverId());
     }
 
     private boolean isCurrentOrderAllApproved(Long instanceId, int nodeOrder)
@@ -328,33 +396,18 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         workflowMapper.updateInstance(instance);
     }
 
-    private static final String BPMN_TEMPLATE =
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-        + "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\""
-        + " xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\""
-        + " xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\""
-        + " xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\""
-        + " id=\"Definitions_1\" targetNamespace=\"http://bpmn.io/schema/bpmn\">"
-        + "<bpmn:process id=\"ContractApproval\" isExecutable=\"false\">"
-        + "<bpmn:startEvent id=\"StartEvent_1\" name=\"开始\"/>"
-        + "<bpmn:task id=\"Task_Submit\" name=\"提交\"/>"
-        + "<bpmn:task id=\"Task_Dept\" name=\"部门审批\"/>"
-        + "<bpmn:task id=\"Task_Finance\" name=\"财务审批\"/>"
-        + "<bpmn:task id=\"Task_Archive\" name=\"归档\"/>"
-        + "<bpmn:endEvent id=\"EndEvent_1\" name=\"结束\"/>"
-        + "<bpmn:sequenceFlow id=\"Flow_1\" sourceRef=\"StartEvent_1\" targetRef=\"Task_Submit\"/>"
-        + "<bpmn:sequenceFlow id=\"Flow_2\" sourceRef=\"Task_Submit\" targetRef=\"Task_Dept\"/>"
-        + "<bpmn:sequenceFlow id=\"Flow_3\" sourceRef=\"Task_Dept\" targetRef=\"Task_Finance\"/>"
-        + "<bpmn:sequenceFlow id=\"Flow_4\" sourceRef=\"Task_Finance\" targetRef=\"Task_Archive\"/>"
-        + "<bpmn:sequenceFlow id=\"Flow_5\" sourceRef=\"Task_Archive\" targetRef=\"EndEvent_1\"/>"
-        + "</bpmn:process>"
-        + "<bpmndi:BPMNDiagram id=\"BPMNDiagram_1\">"
-        + "<bpmndi:BPMNPlane id=\"BPMNPlane_1\" bpmnElement=\"ContractApproval\">"
-        + "<bpmndi:BPMNShape id=\"StartEvent_1_di\" bpmnElement=\"StartEvent_1\"><dc:Bounds x=\"152\" y=\"102\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>"
-        + "<bpmndi:BPMNShape id=\"Task_Submit_di\" bpmnElement=\"Task_Submit\"><dc:Bounds x=\"240\" y=\"80\" width=\"100\" height=\"80\"/></bpmndi:BPMNShape>"
-        + "<bpmndi:BPMNShape id=\"Task_Dept_di\" bpmnElement=\"Task_Dept\"><dc:Bounds x=\"400\" y=\"80\" width=\"100\" height=\"80\"/></bpmndi:BPMNShape>"
-        + "<bpmndi:BPMNShape id=\"Task_Finance_di\" bpmnElement=\"Task_Finance\"><dc:Bounds x=\"560\" y=\"80\" width=\"100\" height=\"80\"/></bpmndi:BPMNShape>"
-        + "<bpmndi:BPMNShape id=\"Task_Archive_di\" bpmnElement=\"Task_Archive\"><dc:Bounds x=\"720\" y=\"80\" width=\"100\" height=\"80\"/></bpmndi:BPMNShape>"
-        + "<bpmndi:BPMNShape id=\"EndEvent_1_di\" bpmnElement=\"EndEvent_1\"><dc:Bounds x=\"882\" y=\"102\" width=\"36\" height=\"36\"/></bpmndi:BPMNShape>"
-        + "</bpmndi:BPMNPlane></bpmndi:BPMNDiagram></bpmn:definitions>";
+    private static final String BPMN_TEMPLATE = loadBpmnTemplate();
+
+    private static String loadBpmnTemplate()
+    {
+        try
+        {
+            ClassPathResource resource = new ClassPathResource("bpmn/contract-approval.bpmn");
+            return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        }
+        catch (IOException e)
+        {
+            throw new IllegalStateException("无法加载合同审批 BPMN 模板", e);
+        }
+    }
 }

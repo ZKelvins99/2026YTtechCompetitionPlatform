@@ -21,12 +21,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.crm.domain.CrmBehaviorTaskStatus;
 import com.ruoyi.system.crm.domain.CrmCustomerBehavior;
 import com.ruoyi.system.crm.domain.CrmCustomerBehaviorImportTemplate;
 import com.ruoyi.system.crm.mapper.CrmCustomerBehaviorMapper;
 import com.ruoyi.system.crm.service.ICrmCustomerBehaviorService;
+import com.ruoyi.system.crm.support.CrmBehaviorBulkInserter;
+import com.ruoyi.system.crm.support.CrmBehaviorStatsCache;
 import com.ruoyi.system.crm.support.CrmBehaviorTaskManager;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -44,11 +47,17 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
     @Autowired
     private CrmCustomerBehaviorAsyncService asyncService;
 
+    @Autowired
+    private CrmBehaviorStatsCache statsCache;
+
+    @Autowired
+    private CrmBehaviorBulkInserter bulkInserter;
+
     @Override
     public String startGenerate(int count)
     {
         String taskId = UUID.randomUUID().toString().replace("-", "");
-        taskManager.createTask(taskId, count);
+        taskManager.createGenerateTask(taskId, SecurityUtils.getUserId(), count);
         asyncService.generateAsync(taskId, count);
         return taskId;
     }
@@ -65,8 +74,9 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
         {
             throw new ServiceException("仅支持 xls、xlsx 格式");
         }
+        Long userId = SecurityUtils.getUserId();
         String taskId = UUID.randomUUID().toString().replace("-", "");
-        taskManager.createTask(taskId, 0);
+        taskManager.createImportTask(taskId, userId, 0, original);
         File dir = new File(RuoYiConfig.getImportPath() + "/behavior");
         if (!dir.exists() && !dir.mkdirs())
         {
@@ -126,13 +136,45 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
     @Override
     public int clearAll()
     {
-        return crmCustomerBehaviorMapper.deleteAll();
+        int rows = crmCustomerBehaviorMapper.deleteAll();
+        statsCache.invalidate();
+        try
+        {
+            statsCache.setCachedTotal(crmCustomerBehaviorMapper.countTotal());
+        }
+        catch (Exception ignored)
+        {
+            statsCache.invalidate();
+        }
+        bulkInserter.clearIdPool();
+        return rows;
     }
 
     @Override
     public CrmBehaviorTaskStatus getTaskStatus(String taskId)
     {
-        return taskManager.getTask(taskId);
+        CrmBehaviorTaskStatus task = taskManager.getTask(taskId);
+        assertTaskOwner(task);
+        return task;
+    }
+
+    @Override
+    public CrmBehaviorTaskStatus getActiveImportTask()
+    {
+        return taskManager.getActiveImportTask(SecurityUtils.getUserId());
+    }
+
+    private void assertTaskOwner(CrmBehaviorTaskStatus task)
+    {
+        if (task == null)
+        {
+            return;
+        }
+        Long userId = SecurityUtils.getUserId();
+        if (task.getUserId() != null && userId != null && !userId.equals(task.getUserId()))
+        {
+            throw new ServiceException("无权查看该任务");
+        }
     }
 
     @Override
@@ -142,9 +184,9 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
         {
             lastId = 0L;
         }
-        if (pageSize <= 0 || pageSize > 500)
+        if (pageSize <= 0 || pageSize > 5000)
         {
-            pageSize = 100;
+            pageSize = 2000;
         }
         List<CrmCustomerBehavior> list = crmCustomerBehaviorMapper.selectScrollList(lastId, pageSize);
         Map<String, Object> data = new HashMap<>();
@@ -156,13 +198,28 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
         }
         data.put("lastId", newLastId);
         data.put("hasMore", list.size() >= pageSize);
-        data.put("total", crmCustomerBehaviorMapper.countTotal());
+        if (lastId == 0L)
+        {
+            data.put("total", resolveDisplayTotal());
+        }
         return data;
     }
 
     @Override
     public long countTotal()
     {
-        return crmCustomerBehaviorMapper.countTotal();
+        return resolveDisplayTotal();
+    }
+
+    @Override
+    public void invalidateTotalCache()
+    {
+        statsCache.invalidate();
+    }
+
+    /** 展示用总量：精确 COUNT，5 分钟内存缓存；不用 USER_TABLES.NUM_ROWS（易与真实行数偏差） */
+    private long resolveDisplayTotal()
+    {
+        return statsCache.getTotal(() -> crmCustomerBehaviorMapper.countTotal());
     }
 }

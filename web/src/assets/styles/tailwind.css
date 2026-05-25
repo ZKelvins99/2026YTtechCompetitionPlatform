@@ -1,0 +1,33 @@
+/* 仅引入 theme + utilities，避免 preflight 与 Element Plus 冲突 */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme {
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+}
+
+@layer components {
+  .tw-card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/50;
+  }
+  .tw-card-hover {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-brand-500/10;
+  }
+  .tw-btn-primary {
+    @apply w-full rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 py-3 text-sm font-semibold text-white shadow-md shadow-brand-500/25 transition hover:from-brand-700 hover:to-brand-600 hover:shadow-lg active:scale-[0.99];
+  }
+  .tw-input-shell :deep(.el-input__wrapper) {
+    @apply rounded-xl border border-slate-200 bg-slate-50/80 shadow-none transition hover:border-brand-300 focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20;
+  }
+}

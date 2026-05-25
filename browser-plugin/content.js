@@ -2,136 +2,288 @@
 // CRM 智能表单助手 — Content Script
 // 比武项目 2.8 得分点：多字段校验 + 模板保存 + 一键填充
 // ==============================================================
-// 运行方式：Chrome / Edge 加载已解压的扩展
-// 匹配页面：所有 /crm/* 路径
-// ==============================================================
 
 (function () {
   'use strict';
 
-  // ──────────────────────── 状态 ────────────────────────
-  let toolbarEl = null;        // 浮动工具栏 DOM
-  let overlayEl = null;        // 模态浮层 DOM
-  let isDialogOpen = false;    // 当前是否有 Element Plus 弹窗打开
-  let scanTimer = null;        // 轮询检测弹窗定时器
+  const STORAGE_KEY = 'crm_form_templates';
+  const TOOLBAR_POS_KEY = 'crm_fp_toolbar_pos';
 
-  // ──────────────────────── 校验规则 ────────────────────────
-  // label 匹配规则（支持子串匹配）
+  let toolbarEl = null;
+  let overlayEl = null;
+  let isDialogOpen = false;
+  let scanTimer = null;
+
+  /** 11 位数字即可（如 12345678910）；不含空格与横线 */
+  function isPhone11Digits(raw) {
+    const digits = String(raw || '').replace(/[\s\-()]/g, '');
+    return /^\d{11}$/.test(digits);
+  }
+
   const RULES = [
-    { label: '客户名称',  required: true,  validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
-    { label: '商机名称',  required: true,  validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
-    { label: '合同名称',  required: true,  validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
-    { label: '联系电话',  required: true,  validate: v => /^1[3-9]\d{9}$/.test(v.replace(/\s/g, '')), msg: '11 位手机号' },
-    { label: '邮箱',      required: false, validate: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), msg: '邮箱格式不正确' },
-    { label: '所属行业',  required: true,  validate: v => v.length > 0, msg: '不能为空' },
-    { label: '客户等级',  required: true,  validate: v => v.length > 0, msg: '请选择客户等级' },
-    { label: '商机阶段',  required: true,  validate: v => v.length > 0, msg: '请选择阶段' },
-    { label: '省份',      required: true,  validate: v => v.length > 0, msg: '不能为空' },
-    { label: '预计金额',  required: true,  validate: v => parseFloat(v) > 0, msg: '须大于 0' },
-    { label: '合同金额',  required: true,  validate: v => parseFloat(v) > 0, msg: '须大于 0' },
-    { label: '详细地址',  required: false, validate: v => !v || v.length >= 5, msg: '建议至少 5 个字符' },
-    { label: '合同编号',  required: true,  validate: v => v.length > 0, msg: '不能为空' },
+    { label: '客户名称', required: true, validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
+    { label: '商机名称', required: true, validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
+    { label: '合同名称', required: true, validate: v => v.length >= 2 && v.length <= 100, msg: '2~100 个字符' },
+    { label: '联系电话', required: true, validate: v => isPhone11Digits(v), msg: '须为 11 位数字' },
+    { label: '邮箱', required: false, validate: v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), msg: '邮箱格式不正确' },
+    { label: '所属行业', required: true, validate: v => v.length > 0, msg: '不能为空' },
+    { label: '客户等级', required: true, validate: v => v.length > 0, msg: '请选择客户等级' },
+    { label: '商机阶段', required: true, validate: v => v.length > 0, msg: '请选择阶段' },
+    { label: '省份', required: true, validate: v => v.length > 0, msg: '不能为空' },
+    { label: '预计金额', required: true, validate: v => parseFloat(v) > 0, msg: '须大于 0' },
+    { label: '合同金额', required: true, validate: v => parseFloat(v) > 0, msg: '须大于 0' },
+    { label: '详细地址', required: false, validate: v => !v || v.length >= 5, msg: '建议至少 5 个字符' },
+    { label: '合同编号', required: true, validate: v => v.length > 0, msg: '不能为空' },
   ];
 
-  // ──────────────────────── UI 注入 ────────────────────────
+  // ──────────────────────── 工具栏（可拖动） ────────────────────────
 
   function createToolbar() {
     if (document.getElementById('crm-fp-toolbar')) return;
     const div = document.createElement('div');
     div.id = 'crm-fp-toolbar';
-    div.className = 'crm-fp-toolbar';
+    div.className = 'crm-fp-toolbar crm-fp-hidden';
     div.innerHTML = `
-      <div class="crm-fp-toolbar-label">📋 表单助手</div>
-      <button class="crm-fp-btn crm-fp-btn-primary" data-action="validate">✅ 校验表单</button>
-      <button class="crm-fp-btn crm-fp-btn-success" data-action="save-template">💾 保存模板</button>
-      <button class="crm-fp-btn crm-fp-btn-warning" data-action="load-template">📂 选择模板</button>
+      <div class="crm-fp-drag-handle" title="按住拖动">⠿</div>
+      <div class="crm-fp-toolbar-head">
+        <span class="crm-fp-toolbar-label">📋 表单助手</span>
+        <button type="button" class="crm-fp-mini-btn" data-action="collapse" title="收起">−</button>
+      </div>
+      <div class="crm-fp-toolbar-body">
+        <button type="button" class="crm-fp-btn crm-fp-btn-primary" data-action="validate">✅ 校验表单</button>
+        <button type="button" class="crm-fp-btn crm-fp-btn-success" data-action="save-template">💾 保存模板</button>
+        <button type="button" class="crm-fp-btn crm-fp-btn-warning" data-action="load-template">📂 选择模板</button>
+      </div>
     `;
     div.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
       e.stopPropagation();
+      if (btn.dataset.action === 'collapse') {
+        div.classList.toggle('crm-fp-collapsed');
+        return;
+      }
       switch (btn.dataset.action) {
-        case 'validate':       handleValidate();       break;
-        case 'save-template':  handleSaveTemplate();   break;
-        case 'load-template':  handleLoadTemplate();   break;
+        case 'validate': handleValidate(); break;
+        case 'save-template': handleSaveTemplate(); break;
+        case 'load-template': handleLoadTemplate(); break;
       }
     });
     document.body.appendChild(div);
     toolbarEl = div;
-    // 延迟显示（确保页面加载）
+    restoreToolbarPosition(div);
+    makeToolbarDraggable(div);
     setTimeout(() => div.classList.remove('crm-fp-hidden'), 300);
   }
 
-  function hideToolbar() {
-    if (toolbarEl) toolbarEl.classList.add('crm-fp-hidden');
+  function restoreToolbarPosition(el) {
+    try {
+      const raw = localStorage.getItem(TOOLBAR_POS_KEY);
+      if (!raw) return;
+      const pos = JSON.parse(raw);
+      if (typeof pos.left === 'number' && typeof pos.top === 'number') {
+        el.style.left = `${pos.left}px`;
+        el.style.top = `${pos.top}px`;
+        el.style.right = 'auto';
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  function saveToolbarPosition(el) {
+    const rect = el.getBoundingClientRect();
+    localStorage.setItem(TOOLBAR_POS_KEY, JSON.stringify({
+      left: Math.round(rect.left),
+      top: Math.round(rect.top)
+    }));
+  }
+
+  function makeToolbarDraggable(el) {
+    const handle = el.querySelector('.crm-fp-drag-handle');
+    if (!handle) return;
+
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+
+    const onMove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      let left = startLeft + dx;
+      let top = startTop + dy;
+      const maxLeft = window.innerWidth - el.offsetWidth - 4;
+      const maxTop = window.innerHeight - el.offsetHeight - 4;
+      left = Math.max(4, Math.min(left, maxLeft));
+      top = Math.max(4, Math.min(top, maxTop));
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.right = 'auto';
+    };
+
+    const onUp = () => {
+      if (!dragging) return;
+      dragging = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      el.classList.remove('crm-fp-dragging');
+      saveToolbarPosition(el);
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = el.getBoundingClientRect();
+      dragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      el.style.left = `${startLeft}px`;
+      el.style.top = `${startTop}px`;
+      el.style.right = 'auto';
+      el.classList.add('crm-fp-dragging');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
   }
 
   function showToolbar() {
     if (toolbarEl) toolbarEl.classList.remove('crm-fp-hidden');
   }
 
-  // ──────────────────────── 表单字段扫描 ────────────────────────
+  // ──────────────────────── 可见性与弹窗 ────────────────────────
 
-  /**
-   * 获取当前可见弹窗中的所有表单字段
-   * @returns {{ label: string, value: string, el: HTMLElement, type: string }[]}
-   */
-  function getFormFields() {
-    const dialog = findVisibleDialog();
+  function isElementVisible(el) {
+    if (!el || !el.isConnected) return false;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    if (parseFloat(style.opacity) === 0) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 || rect.height > 0;
+  }
+
+  function findVisibleDialog() {
+    const overlays = document.querySelectorAll('.el-overlay-dialog');
+    for (const ov of overlays) {
+      if (!isElementVisible(ov)) continue;
+      const dialog = ov.querySelector('.el-dialog');
+      if (dialog && isElementVisible(dialog)) return dialog;
+    }
+    const dialogs = document.querySelectorAll('.el-dialog');
+    for (const d of dialogs) {
+      if (isElementVisible(d)) return d;
+    }
+    return null;
+  }
+
+  function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // ──────────────────────── 字段识别（Element Plus） ────────────────────────
+
+  function readSelectDisplayValue(content) {
+    const selected = content.querySelectorAll(
+      '.el-select__selected-item:not(.el-select__placeholder):not(.is-transparent)'
+    );
+    if (selected.length) {
+      const texts = Array.from(selected)
+        .map(n => (n.textContent || '').trim())
+        .filter(t => t && t !== '请选择' && !t.startsWith('请'));
+      if (texts.length) return texts.join(', ');
+    }
+    const tags = content.querySelector('.el-select__tags-text');
+    if (tags) return tags.textContent.trim();
+    const caret = content.querySelector('.el-select__caret');
+    const wrapper = content.querySelector('.el-select__wrapper, .el-select .el-input__wrapper');
+    if (wrapper) {
+      const clone = wrapper.cloneNode(true);
+      clone.querySelectorAll('.el-select__caret, .el-icon, input').forEach(n => n.remove());
+      const t = (clone.textContent || '').trim();
+      if (t && t !== '请选择') return t;
+    }
+    return '';
+  }
+
+  function detectFieldControl(content) {
+    const selectRoot = content.querySelector('.el-select');
+    if (selectRoot) {
+      return { type: 'select', value: readSelectDisplayValue(content), content };
+    }
+    const dateEditor = content.querySelector('.el-date-editor');
+    if (dateEditor) {
+      const inp = dateEditor.querySelector('input.el-input__inner');
+      return { type: 'date', value: inp?.value || '', inputEl: inp, content };
+    }
+    const numWrap = content.querySelector('.el-input-number');
+    if (numWrap) {
+      const inp = numWrap.querySelector('input.el-input__inner');
+      return { type: 'number', value: inp?.value || '', inputEl: inp, content };
+    }
+    const textarea = content.querySelector('textarea.el-textarea__inner');
+    if (textarea) {
+      return { type: 'textarea', value: textarea.value || '', inputEl: textarea, content };
+    }
+    const inputs = content.querySelectorAll('input.el-input__inner');
+    for (const inp of inputs) {
+      if (inp.type === 'hidden' || inp.closest('.el-select')) continue;
+      return { type: 'text', value: inp.value || '', inputEl: inp, content };
+    }
+    return null;
+  }
+
+  function collectFormFields(dialog) {
     if (!dialog) return [];
-    const items = dialog.querySelectorAll('.el-form-item');
     const fields = [];
-    items.forEach((item) => {
+    dialog.querySelectorAll('.el-form-item').forEach((item) => {
       const labelEl = item.querySelector('.el-form-item__label');
       if (!labelEl) return;
-      const label = labelEl.textContent.trim().replace(/:*\s*$/, '');
+      const label = labelEl.textContent.trim().replace(/[*:：\s]+$/g, '').replace(/^\*/, '');
       const content = item.querySelector('.el-form-item__content');
       if (!content) return;
-
-      let value = '';
-      let type = 'text';
-
-      // el-input
-      const input = content.querySelector('input.el-input__inner');
-      if (input && input.type !== 'hidden') {
-        value = input.value || '';
-        type = 'text';
-      }
-      // el-textarea
-      const textarea = content.querySelector('textarea.el-textarea__inner');
-      if (textarea) {
-        value = textarea.value || '';
-        type = 'textarea';
-      }
-      // el-select — 获取选中的文本
-      const selectedItem = content.querySelector('.el-select__selected-item');
-      if (selectedItem) {
-        value = selectedItem.textContent.trim();
-        type = 'select';
-      }
-      // el-date-picker — input with placeholder-like value
-      const dateInput = content.querySelector('.el-date-editor input.el-input__inner');
-      if (dateInput && !input) {
-        // already handled above if input exists
-        value = dateInput.value || '';
-        type = 'date';
-      }
-      // el-input-number — inner input
-      const numInput = content.querySelector('.el-input-number input.el-input__inner');
-      if (numInput && !input) {
-        value = numInput.value || '';
-        type = 'number';
-      }
-
-      fields.push({ label, value, el: item, type });
+      const control = detectFieldControl(content);
+      if (!control) return;
+      fields.push({
+        label,
+        value: control.value,
+        type: control.type,
+        el: item,
+        content,
+        control
+      });
     });
     return fields;
   }
 
-  function findVisibleDialog() {
-    const dialogs = document.querySelectorAll('.el-dialog');
-    for (const d of dialogs) {
-      if (d.offsetParent !== null) return d;
+  function getFormFields() {
+    return collectFormFields(findVisibleDialog());
+  }
+
+  function runFormValidation(dialog) {
+    const fields = collectFormFields(dialog || findVisibleDialog());
+    if (!fields.length) {
+      return { ok: true, results: [], fields: [] };
+    }
+    const results = validateFields(fields);
+    const ok = !results.some(r => r.pass === 'fail');
+    return { ok, results, fields };
+  }
+
+  function labelsMatch(itemLabel, templateLabel) {
+    return itemLabel === templateLabel
+      || itemLabel.includes(templateLabel)
+      || templateLabel.includes(itemLabel);
+  }
+
+  function findFormItemByLabel(dialog, label) {
+    for (const item of dialog.querySelectorAll('.el-form-item')) {
+      const labelEl = item.querySelector('.el-form-item__label');
+      if (!labelEl) continue;
+      const itemLabel = labelEl.textContent.trim().replace(/[*:：\s]+$/g, '').replace(/^\*/, '');
+      if (labelsMatch(itemLabel, label)) return item;
     }
     return null;
   }
@@ -139,25 +291,14 @@
   // ──────────────────────── 校验 ────────────────────────
 
   function validateFields(fields) {
-    const results = fields.map((f) => {
+    return fields.map((f) => {
       const rule = RULES.find(r => f.label.includes(r.label) || r.label.includes(f.label));
-      if (!rule) {
-        return { ...f, pass: 'skip', msg: '未配置校验规则' };
-      }
-      if (!rule.required && !f.value) {
-        return { ...f, pass: 'skip', msg: '选填项，跳过' };
-      }
+      if (!rule) return { ...f, pass: 'skip', msg: '未配置校验规则' };
+      if (!rule.required && !f.value) return { ...f, pass: 'skip', msg: '选填项，跳过' };
       const ok = rule.validate(f.value);
-      return {
-        ...f,
-        pass: ok ? 'pass' : 'fail',
-        msg: ok ? '✓' : rule.msg,
-      };
+      return { ...f, pass: ok ? 'pass' : 'fail', msg: ok ? '✓' : rule.msg };
     });
-    return results;
   }
-
-  // ──────────────────────── 校验结果浮层 ────────────────────────
 
   function showResultModal(results) {
     closeOverlay();
@@ -188,7 +329,7 @@
       <div class="crm-fp-modal">
         <div class="crm-fp-modal-header">
           <span>📋 表单校验结果</span>
-          <button class="crm-fp-modal-close" data-action="close">✕</button>
+          <button type="button" class="crm-fp-modal-close" data-action="close">✕</button>
         </div>
         <div class="crm-fp-modal-body">
           <div class="crm-fp-summary">
@@ -200,22 +341,19 @@
           <ul class="crm-fp-result-list">${itemsHtml}</ul>
         </div>
         <div class="crm-fp-modal-footer">
-          ${failCount === 0 ? '<button class="crm-fp-btn crm-fp-btn-success" data-action="save-after-validate">💾 全部通过，保存为模板</button>' : ''}
-          <button class="crm-fp-btn crm-fp-btn-primary" data-action="close">关闭</button>
+          ${failCount === 0 ? '<button type="button" class="crm-fp-btn crm-fp-btn-success" data-action="save-after-validate">💾 全部通过，保存为模板</button>' : ''}
+          <button type="button" class="crm-fp-btn crm-fp-btn-primary" data-action="close">关闭</button>
         </div>
       </div>
     `;
     overlay.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-action]');
       if (!btn) return;
-      if (btn.dataset.action === 'close') {
+      if (btn.dataset.action === 'close') closeOverlay();
+      else if (btn.dataset.action === 'save-after-validate') {
         closeOverlay();
-      } else if (btn.dataset.action === 'save-after-validate') {
-        closeOverlay();
-        // 收集当前字段值
-        const fields = getFormFields();
         const data = {};
-        fields.forEach(f => { data[f.label] = f.value; });
+        getFormFields().forEach(f => { data[f.label] = f.value; });
         showSaveTemplateDialog(data);
       }
     });
@@ -224,16 +362,39 @@
   }
 
   function handleValidate() {
-    const fields = getFormFields();
+    const { results, fields } = runFormValidation();
     if (fields.length === 0) {
       showToast('没有找到表单字段，请先打开新增/编辑弹窗', 'warning');
       return;
     }
-    const results = validateFields(fields);
     showResultModal(results);
   }
 
-  // ──────────────────────── 模板管理 ────────────────────────
+  /** 拦截弹窗「确定/保存」：有配置规则且存在失败项时不允许提交 */
+  function guardFormSubmit(e) {
+    const btn = e.target?.closest?.('.el-dialog__footer .el-button--primary');
+    if (!btn) return;
+    if (btn.closest('.crm-fp-overlay, #crm-fp-toolbar')) return;
+
+    const dialog = btn.closest('.el-dialog');
+    if (!dialog || !isElementVisible(dialog)) return;
+
+    const { ok, results, fields } = runFormValidation(dialog);
+    if (fields.length === 0) return;
+
+    const hasRule = results.some(r => r.pass !== 'skip');
+    if (!hasRule) return;
+
+    if (!ok) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      showResultModal(results);
+      showToast('表单校验未通过，无法提交', 'error');
+    }
+  }
+
+  // ──────────────────────── 模板 ────────────────────────
 
   function showSaveTemplateDialog(prefillData) {
     closeOverlay();
@@ -243,7 +404,7 @@
       <div class="crm-fp-modal" style="width:420px">
         <div class="crm-fp-modal-header">
           <span>💾 保存为模板</span>
-          <button class="crm-fp-modal-close" data-action="close">✕</button>
+          <button type="button" class="crm-fp-modal-close" data-action="close">✕</button>
         </div>
         <div class="crm-fp-modal-body">
           <div class="crm-fp-save-input">
@@ -252,8 +413,8 @@
           <div style="font-size:13px;color:#909399">将保存当前表单中 ${Object.keys(prefillData).length} 个字段的值</div>
         </div>
         <div class="crm-fp-modal-footer">
-          <button class="crm-fp-btn crm-fp-btn-primary" data-action="confirm-save">保存</button>
-          <button class="crm-fp-btn" data-action="close" style="border:1px solid #dcdfe6;background:#fff">取消</button>
+          <button type="button" class="crm-fp-btn crm-fp-btn-primary" data-action="confirm-save">保存</button>
+          <button type="button" class="crm-fp-btn" data-action="close" style="border:1px solid #dcdfe6;background:#fff">取消</button>
         </div>
       </div>
     `;
@@ -262,8 +423,7 @@
       if (!btn) return;
       if (btn.dataset.action === 'close') { closeOverlay(); return; }
       if (btn.dataset.action === 'confirm-save') {
-        const nameInput = overlay.querySelector('#crm-fp-template-name');
-        const name = nameInput.value.trim();
+        const name = overlay.querySelector('#crm-fp-template-name').value.trim();
         if (!name) { showToast('请输入模板名称', 'error'); return; }
         await saveTemplate(name, prefillData);
         closeOverlay();
@@ -272,8 +432,7 @@
     });
     document.body.appendChild(overlay);
     overlayEl = overlay;
-    // Auto focus
-    setTimeout(() => overlay.querySelector('#crm-fp-template-name').focus(), 100);
+    setTimeout(() => overlay.querySelector('#crm-fp-template-name')?.focus(), 100);
   }
 
   async function handleSaveTemplate() {
@@ -298,8 +457,8 @@
             <div class="crm-fp-template-meta">${Object.keys(t.data).length} 个字段 · ${new Date(t.savedAt).toLocaleString()}</div>
           </div>
           <div class="crm-fp-template-actions">
-            <button class="crm-fp-template-btn fill" data-action="fill" data-index="${i}">一键填充</button>
-            <button class="crm-fp-template-btn del" data-action="delete-template" data-index="${i}">删除</button>
+            <button type="button" class="crm-fp-template-btn fill" data-action="fill" data-index="${i}">一键填充</button>
+            <button type="button" class="crm-fp-template-btn del" data-action="delete-template" data-index="${i}">删除</button>
           </div>
         </li>
       `).join('');
@@ -310,13 +469,13 @@
       <div class="crm-fp-modal" style="width:480px">
         <div class="crm-fp-modal-header">
           <span>📂 选择模板</span>
-          <button class="crm-fp-modal-close" data-action="close">✕</button>
+          <button type="button" class="crm-fp-modal-close" data-action="close">✕</button>
         </div>
         <div class="crm-fp-modal-body">
           <ul class="crm-fp-template-list">${itemsHtml}</ul>
         </div>
         <div class="crm-fp-modal-footer">
-          <button class="crm-fp-btn" data-action="close" style="border:1px solid #dcdfe6;background:#fff">关闭</button>
+          <button type="button" class="crm-fp-btn" data-action="close" style="border:1px solid #dcdfe6;background:#fff">关闭</button>
         </div>
       </div>
     `;
@@ -327,13 +486,11 @@
       const idx = parseInt(btn.dataset.index, 10);
       if (btn.dataset.action === 'fill') {
         closeOverlay();
-        await applyTemplate(templates[idx].data);
-        showToast(`已填充模板「${templates[idx].name}」`, 'success');
+        const n = await applyTemplate(templates[idx].data);
+        showToast(n > 0 ? `已填充 ${n} 个字段` : '未匹配到可填充字段', n > 0 ? 'success' : 'warning');
       } else if (btn.dataset.action === 'delete-template') {
         await deleteTemplate(idx);
-        // Refresh
-        const updated = await getAllTemplates();
-        showTemplateList(updated);
+        showTemplateList(await getAllTemplates());
       }
     });
     document.body.appendChild(overlay);
@@ -341,13 +498,8 @@
   }
 
   async function handleLoadTemplate() {
-    const templates = await getAllTemplates();
-    showTemplateList(templates);
+    showTemplateList(await getAllTemplates());
   }
-
-  // ──────────────────────── Chrome Storage ────────────────────────
-
-  const STORAGE_KEY = 'crm_form_templates';
 
   function getAllTemplates() {
     return new Promise((resolve) => {
@@ -361,7 +513,6 @@
     return new Promise(async (resolve) => {
       const list = await getAllTemplates();
       list.unshift({ name, data, savedAt: Date.now() });
-      // 限制最多 50 个
       if (list.length > 50) list.length = 50;
       chrome.storage.local.set({ [STORAGE_KEY]: list }, resolve);
     });
@@ -375,116 +526,153 @@
     });
   }
 
-  // ──────────────────────── 一键填充 ────────────────────────
+  // ──────────────────────── 填充 ────────────────────────
 
-  async function applyTemplate(data) {
-    const entries = Object.entries(data);
-    let filledCount = 0;
-
-    for (const [label, value] of entries) {
-      const dialog = findVisibleDialog();
-      if (!dialog) break;
-      const items = dialog.querySelectorAll('.el-form-item');
-      for (const item of items) {
-        const labelEl = item.querySelector('.el-form-item__label');
-        if (!labelEl) continue;
-        const itemLabel = labelEl.textContent.trim().replace(/:*\s*$/, '');
-        // 匹配 label（支持包含关系）
-        if (!itemLabel.includes(label) && !label.includes(itemLabel)) continue;
-
-        const content = item.querySelector('.el-form-item__content');
-        if (!content) continue;
-
-        // el-input
-        const input = content.querySelector('input.el-input__inner');
-        if (input && input.type !== 'hidden') {
-          setNativeValue(input, value);
-          filledCount++;
-          continue;
-        }
-        // textarea
-        const textarea = content.querySelector('textarea.el-textarea__inner');
-        if (textarea) {
-          setNativeValue(textarea, value);
-          filledCount++;
-          continue;
-        }
-        // el-select — click to expand, then find option
-        const selectWrapper = content.querySelector('.el-select__wrapper');
-        if (selectWrapper) {
-          await selectAndWait(selectWrapper, value);
-          filledCount++;
-          continue;
-        }
-      }
-    }
-    showToast(`已填充 ${filledCount} 个字段`, filledCount > 0 ? 'success' : 'warning');
-  }
-
-  /** 设置原生 input/textarea 的值并触发 Vue 响应式更新 */
   function setNativeValue(el, value) {
-    // 获取 input / textarea 的原生 value setter（触发 Vue 响应式需要）
+    if (!el) return;
     let setter;
     if (el instanceof window.HTMLTextAreaElement) {
       setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value');
     } else {
       setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
     }
-    if (setter && setter.set) {
-      setter.set.call(el, value);
-    } else {
-      el.value = value;
-    }
+    if (setter?.set) setter.set.call(el, value);
+    else el.value = value;
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
-    el.dispatchEvent(new Event('blur', { bubbles: true }));
   }
 
-  /** 点击 el-select 后等待下拉菜单出现，再点匹配项 */
-  function selectAndWait(wrapper, targetText) {
-    return new Promise((resolve) => {
-      // 先点击展开
-      wrapper.click();
-
-      let attempts = 0;
-      const check = () => {
-        attempts++;
-        const popper = document.querySelector('.el-select__popper');
-        if ((!popper || popper.style.display === 'none' || popper.style.visibility === 'hidden') && attempts < 20) {
-          setTimeout(check, 60);
-          return;
-        }
-        if (popper) {
-          const options = popper.querySelectorAll('.el-select-dropdown__item');
-          let clicked = false;
-          options.forEach((opt) => {
-            const text = opt.textContent.trim();
-            if (text === targetText || targetText.includes(text) || text.includes(targetText)) {
-              opt.click();
-              clicked = true;
-            }
-          });
-          if (!clicked && options.length > 0) {
-            // 尝试用 index>0（跳过 placeholder）
-            for (let i = 1; i < options.length; i++) {
-              if (options[i].textContent.trim()) {
-                options[i].click();
-                break;
-              }
-            }
-          }
-        }
-        // 关闭下拉菜单
-        setTimeout(() => {
-          document.body.click();
-          resolve();
-        }, 100);
-      };
-      setTimeout(check, 80);
-    });
+  function isPopperVisible(popper) {
+    if (!popper || !popper.isConnected) return false;
+    if (popper.getAttribute('aria-hidden') === 'true') return false;
+    const style = window.getComputedStyle(popper);
+    if (style.display === 'none' || style.visibility === 'hidden') return false;
+    const rect = popper.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
   }
 
-  // ──────────────────────── Toast 提示 ────────────────────────
+  function findOpenSelectPopper() {
+    const poppers = document.querySelectorAll('.el-select__popper.el-popper, .el-popper.el-select__popper');
+    for (let i = poppers.length - 1; i >= 0; i--) {
+      if (isPopperVisible(poppers[i])) return poppers[i];
+    }
+    return null;
+  }
+
+  function clickOption(optionEl) {
+    optionEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    optionEl.click();
+  }
+
+  /** Close el-select popper only — never document.body / Escape (closes el-dialog). */
+  async function closeSelectDropdown(trigger, dialog) {
+    await sleep(80);
+    if (!findOpenSelectPopper()) return;
+
+    const hostDialog = dialog || trigger?.closest?.('.el-dialog');
+
+    // EP 2.x: toggle trigger or click inside dialog body (outside popper) closes dropdown.
+    trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    trigger.click();
+    await sleep(80);
+    if (!findOpenSelectPopper()) return;
+
+    if (hostDialog) {
+      const clickTarget = hostDialog.querySelector('.el-dialog__body') || hostDialog;
+      clickTarget.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+      clickTarget.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+      clickTarget.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      await sleep(80);
+      if (!findOpenSelectPopper()) return;
+    }
+
+    const inp = trigger.querySelector('input')
+      || trigger.closest('.el-select')?.querySelector('input');
+    if (inp && document.activeElement === inp) {
+      inp.blur();
+      await sleep(80);
+    }
+  }
+
+  async function fillSelect(content, targetText, dialog) {
+    const select = content.querySelector('.el-select');
+    if (!select || !targetText) return false;
+
+    const trigger = content.querySelector('.el-select__wrapper')
+      || content.querySelector('.el-select .el-input__wrapper')
+      || content.querySelector('.el-select .el-input')
+      || select;
+    trigger.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    trigger.click();
+
+    let popper = null;
+    for (let i = 0; i < 30; i++) {
+      await sleep(50);
+      popper = findOpenSelectPopper();
+      if (popper) break;
+    }
+    if (!popper) return false;
+
+    const options = popper.querySelectorAll(
+      '.el-select-dropdown__item:not(.is-disabled), .el-option:not(.is-disabled)'
+    );
+    const target = String(targetText).trim();
+    let matched = null;
+    for (const opt of options) {
+      const text = (opt.textContent || '').trim();
+      if (!text || text === '请选择' || text === '无数据') continue;
+      if (text === target || text.includes(target) || target.includes(text)) {
+        matched = opt;
+        break;
+      }
+    }
+    if (!matched && options.length) {
+      matched = options[0];
+    }
+    if (!matched) return false;
+
+    clickOption(matched);
+    await closeSelectDropdown(trigger, dialog);
+    return true;
+  }
+
+  async function fillFieldControl(control, value, dialog) {
+    if (!control || value == null || value === '') return false;
+    const strVal = String(value);
+
+    if (control.type === 'select') {
+      return fillSelect(control.content, strVal, dialog);
+    }
+    if (control.inputEl) {
+      setNativeValue(control.inputEl, strVal);
+      return true;
+    }
+    return false;
+  }
+
+  async function applyTemplate(data) {
+    const dialog = findVisibleDialog();
+    if (!dialog) {
+      showToast('请先打开表单弹窗', 'warning');
+      return 0;
+    }
+
+    let filledCount = 0;
+    for (const [label, value] of Object.entries(data)) {
+      const item = findFormItemByLabel(dialog, label);
+      if (!item) continue;
+      const content = item.querySelector('.el-form-item__content');
+      if (!content) continue;
+      const control = detectFieldControl(content);
+      if (!control) continue;
+      const ok = await fillFieldControl(control, value, dialog);
+      if (ok) filledCount++;
+      await sleep(80);
+    }
+    return filledCount;
+  }
+
+  // ──────────────────────── UI 工具 ────────────────────────
 
   function showToast(msg, type) {
     const colors = { success: '#67c23a', error: '#f56c6c', warning: '#e6a23c', info: '#909399' };
@@ -506,8 +694,6 @@
     }, 2500);
   }
 
-  // ──────────────────────── 工具 ────────────────────────
-
   function closeOverlay() {
     if (overlayEl) { overlayEl.remove(); overlayEl = null; }
   }
@@ -517,40 +703,26 @@
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // ──────────────────────── 弹窗检测 ────────────────────────
-
   function startDialogWatcher() {
-    // 每 500ms 检测是否有弹窗打开
     scanTimer = setInterval(() => {
-      const dialog = findVisibleDialog();
-      const nowOpen = !!dialog;
+      const nowOpen = !!findVisibleDialog();
       if (nowOpen !== isDialogOpen) {
         isDialogOpen = nowOpen;
-        if (nowOpen) {
-          showToolbar();
-        } else {
-          // 弹窗关闭时不清空，让用户还能操作
-        }
+        if (nowOpen) showToolbar();
       }
     }, 500);
   }
 
-  // ──────────────────────── 初始化 ────────────────────────
-
   function init() {
-    // 仅在 CRM 页面激活
     if (!window.location.pathname.includes('/crm/')) return;
-
     createToolbar();
     startDialogWatcher();
-
-    // 点击页面空白或 ESC 关闭浮层
+    document.addEventListener('click', guardFormSubmit, true);
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') closeOverlay();
     });
   }
 
-  // DOM 就绪后启动
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

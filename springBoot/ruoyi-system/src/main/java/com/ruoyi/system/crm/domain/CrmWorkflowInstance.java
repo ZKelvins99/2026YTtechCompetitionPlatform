@@ -29,6 +29,12 @@ public class CrmWorkflowInstance extends BaseEntity
 
     private List<CrmWorkflowNode> nodes;
 
+    /** 当前用户是否可操作当前节点（含管理员） */
+    private Boolean canOperate;
+
+    /** BPMN 流程图 XML（与实例一并返回，避免单独接口丢数据） */
+    private String bpmnXml;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getProcessType() { return processType; }
@@ -51,4 +57,8 @@ public class CrmWorkflowInstance extends BaseEntity
     public void setEndTime(Date endTime) { this.endTime = endTime; }
     public List<CrmWorkflowNode> getNodes() { return nodes; }
     public void setNodes(List<CrmWorkflowNode> nodes) { this.nodes = nodes; }
+    public Boolean getCanOperate() { return canOperate; }
+    public void setCanOperate(Boolean canOperate) { this.canOperate = canOperate; }
+    public String getBpmnXml() { return bpmnXml; }
+    public void setBpmnXml(String bpmnXml) { this.bpmnXml = bpmnXml; }
 }

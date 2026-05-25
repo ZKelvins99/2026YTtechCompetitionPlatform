@@ -7,9 +7,17 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -18,63 +26,51 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.crm.domain.CrmCustomerBehavior;
 import com.ruoyi.system.crm.mapper.CrmCustomerBehaviorMapper;
+import com.ruoyi.system.crm.support.CrmBehaviorBulkInserter;
+import com.ruoyi.system.crm.support.CrmBehaviorStatsCache;
 import com.ruoyi.system.crm.support.CrmBehaviorTaskManager;
 
 @Service
 public class CrmCustomerBehaviorAsyncService
 {
     private static final Logger log = LoggerFactory.getLogger(CrmCustomerBehaviorAsyncService.class);
-    private static final int BATCH_SIZE = 500;
+    private static final int CONSUMER_THREADS = 3;
+    private static final int QUEUE_CAPACITY = 24;
+    private static final int PROGRESS_STEP = 2000;
+    private static final List<CrmCustomerBehavior> END_SIGNAL = Collections.emptyList();
+
     private static final String[] DATE_PATTERNS = {
         "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd"
     };
 
     @Autowired
-    private CrmCustomerBehaviorMapper crmCustomerBehaviorMapper;
+    private CrmBehaviorBulkInserter bulkInserter;
 
     @Autowired
     private CrmBehaviorTaskManager taskManager;
 
+    @Autowired
+    private CrmBehaviorStatsCache statsCache;
+
+    @Autowired
+    private CrmCustomerBehaviorMapper crmCustomerBehaviorMapper;
+
+    @Autowired
+    @Qualifier("crmBehaviorImportExecutor")
+    private ThreadPoolTaskExecutor crmBehaviorImportExecutor;
+
     @Async("threadPoolTaskExecutor")
     public void generateAsync(String taskId, int count)
     {
-        try
-        {
-            Random random = new Random();
-            int processed = 0;
-            while (processed < count)
-            {
-                int batchCount = Math.min(BATCH_SIZE, count - processed);
-                List<CrmCustomerBehavior> batch = new ArrayList<>(batchCount);
-                for (int i = 0; i < batchCount; i++)
-                {
-                    CrmCustomerBehavior row = new CrmCustomerBehavior();
-                    row.setCustomerId((long) (random.nextInt(500) + 1));
-                    String type = CrmCustomerBehaviorServiceImpl.BEHAVIOR_TYPES[random.nextInt(CrmCustomerBehaviorServiceImpl.BEHAVIOR_TYPES.length)];
-                    row.setBehaviorType(type);
-                    row.setDescription(type + "记录-" + (processed + i + 1));
-                    Calendar cal = Calendar.getInstance();
-                    cal.add(Calendar.DAY_OF_YEAR, -random.nextInt(365));
-                    row.setBehaviorTime(cal.getTime());
-                    batch.add(row);
-                }
-                assignIdsAndInsert(batch);
-                processed += batchCount;
-                taskManager.updateProgress(taskId, processed);
-            }
-            taskManager.markDone(taskId);
-        }
-        catch (Exception e)
-        {
-            log.error("行为数据生成失败 taskId={}", taskId, e);
-            taskManager.markFailed(taskId, e.getMessage());
-        }
+        runPipeline(taskId, count);
     }
 
     @Async("threadPoolTaskExecutor")
@@ -88,35 +84,8 @@ public class CrmCustomerBehaviorAsyncService
             {
                 throw new ServiceException("Excel 无有效工作表");
             }
-            DataFormatter formatter = new DataFormatter();
-            int total = countDataRows(sheet, formatter);
-            taskManager.updateTotal(taskId, total);
-            List<CrmCustomerBehavior> batch = new ArrayList<>(BATCH_SIZE);
-            int processed = 0;
-            int lastRowNum = sheet.getLastRowNum();
-            for (int i = 1; i <= lastRowNum; i++)
-            {
-                Row row = sheet.getRow(i);
-                if (row == null || isEmptyRow(row, formatter))
-                {
-                    continue;
-                }
-                batch.add(parseRow(row, formatter, i + 1));
-                if (batch.size() >= BATCH_SIZE)
-                {
-                    assignIdsAndInsert(batch);
-                    processed += batch.size();
-                    taskManager.updateProgress(taskId, processed);
-                    batch.clear();
-                }
-            }
-            if (!batch.isEmpty())
-            {
-                assignIdsAndInsert(batch);
-                processed += batch.size();
-                taskManager.updateProgress(taskId, processed);
-            }
-            taskManager.markDone(taskId);
+            taskManager.updateTotal(taskId, Math.max(1, sheet.getLastRowNum()));
+            runExcelPipeline(taskId, sheet);
         }
         catch (Exception e)
         {
@@ -135,28 +104,184 @@ public class CrmCustomerBehaviorAsyncService
         }
     }
 
-    private void assignIdsAndInsert(List<CrmCustomerBehavior> batch)
+    private void runExcelPipeline(String taskId, Sheet sheet)
     {
-        List<Long> ids = crmCustomerBehaviorMapper.selectNextIds(batch.size());
-        for (int i = 0; i < batch.size(); i++)
-        {
-            batch.get(i).setId(ids.get(i));
-        }
-        crmCustomerBehaviorMapper.batchInsert(batch);
+        runPipeline(taskId, (queue, failed, failMessage) -> produceFromSheet(sheet, queue, failed, failMessage));
     }
 
-    private int countDataRows(Sheet sheet, DataFormatter formatter)
+    private void runPipeline(String taskId, int count)
     {
-        int total = 0;
-        for (int i = 1; i <= sheet.getLastRowNum(); i++)
+        runPipeline(taskId, (queue, failed, failMessage) -> produceGenerated(count, queue, failed, failMessage));
+    }
+
+    @FunctionalInterface
+    private interface BatchProducer
+    {
+        void produce(BlockingQueue<List<CrmCustomerBehavior>> queue,
+            AtomicBoolean failed, AtomicReference<String> failMessage) throws Exception;
+    }
+
+    private void runPipeline(String taskId, BatchProducer producer)
+    {
+        BlockingQueue<List<CrmCustomerBehavior>> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
+        AtomicInteger processed = new AtomicInteger(0);
+        AtomicBoolean failed = new AtomicBoolean(false);
+        AtomicReference<String> failMessage = new AtomicReference<>();
+        CountDownLatch consumersDone = new CountDownLatch(CONSUMER_THREADS);
+
+        for (int i = 0; i < CONSUMER_THREADS; i++)
         {
-            Row row = sheet.getRow(i);
-            if (row != null && !isEmptyRow(row, formatter))
+            crmBehaviorImportExecutor.execute(() -> consumeBatches(taskId, queue, processed, failed, failMessage, consumersDone));
+        }
+
+        try
+        {
+            producer.produce(queue, failed, failMessage);
+            for (int i = 0; i < CONSUMER_THREADS; i++)
             {
-                total++;
+                queue.put(END_SIGNAL);
+            }
+            if (!consumersDone.await(6, TimeUnit.HOURS))
+            {
+                throw new ServiceException("导入超时");
+            }
+            if (failed.get())
+            {
+                throw new ServiceException(StringUtils.isNotEmpty(failMessage.get())
+                    ? failMessage.get() : "导入失败");
+            }
+            int finalProcessed = processed.get();
+            taskManager.updateProgress(taskId, finalProcessed);
+            taskManager.markDone(taskId);
+            warmStatsCacheAfterBulkChange();
+            bulkInserter.clearIdPool();
+        }
+        catch (Exception e)
+        {
+            log.error("行为数据任务失败 taskId={}", taskId, e);
+            taskManager.markFailed(taskId, e.getMessage());
+            for (int i = 0; i < CONSUMER_THREADS; i++)
+            {
+                queue.offer(END_SIGNAL);
             }
         }
-        return total;
+    }
+
+    private void warmStatsCacheAfterBulkChange()
+    {
+        try
+        {
+            statsCache.setCachedTotal(crmCustomerBehaviorMapper.countTotal());
+        }
+        catch (Exception e)
+        {
+            log.warn("行为数据总量缓存预热失败", e);
+            statsCache.invalidate();
+        }
+    }
+
+    private void consumeBatches(String taskId, BlockingQueue<List<CrmCustomerBehavior>> queue,
+        AtomicInteger processed, AtomicBoolean failed, AtomicReference<String> failMessage,
+        CountDownLatch consumersDone)
+    {
+        try
+        {
+            while (true)
+            {
+                List<CrmCustomerBehavior> batch = queue.take();
+                if (batch == END_SIGNAL)
+                {
+                    break;
+                }
+                if (failed.get())
+                {
+                    continue;
+                }
+                bulkInserter.insertBatch(batch);
+                int p = processed.addAndGet(batch.size());
+                if (p % PROGRESS_STEP < batch.size() || p == batch.size())
+                {
+                    taskManager.updateProgress(taskId, p);
+                }
+            }
+        }
+        catch (InterruptedException e)
+        {
+            Thread.currentThread().interrupt();
+            failed.set(true);
+            failMessage.compareAndSet(null, "导入被中断");
+        }
+        catch (Exception e)
+        {
+            failed.set(true);
+            failMessage.compareAndSet(null, e.getMessage());
+            log.error("行为数据批量写入失败 taskId={}", taskId, e);
+        }
+        finally
+        {
+            consumersDone.countDown();
+        }
+    }
+
+    private void produceFromSheet(Sheet sheet, BlockingQueue<List<CrmCustomerBehavior>> queue,
+        AtomicBoolean failed, AtomicReference<String> failMessage) throws Exception
+    {
+        DataFormatter formatter = new DataFormatter();
+        List<CrmCustomerBehavior> batch = new ArrayList<>(CrmBehaviorBulkInserter.BATCH_SIZE);
+        int lastRowNum = sheet.getLastRowNum();
+        for (int i = 1; i <= lastRowNum && !failed.get(); i++)
+        {
+            Row row = sheet.getRow(i);
+            if (row == null || isEmptyRow(row, formatter))
+            {
+                continue;
+            }
+            batch.add(parseRow(row, formatter, i + 1));
+            if (batch.size() >= CrmBehaviorBulkInserter.BATCH_SIZE)
+            {
+                queue.put(new ArrayList<>(batch));
+                batch.clear();
+            }
+        }
+        if (!batch.isEmpty() && !failed.get())
+        {
+            queue.put(batch);
+        }
+        if (failed.get())
+        {
+            throw new ServiceException(failMessage.get());
+        }
+    }
+
+    private void produceGenerated(int count, BlockingQueue<List<CrmCustomerBehavior>> queue,
+        AtomicBoolean failed, AtomicReference<String> failMessage) throws InterruptedException
+    {
+        Random random = new Random();
+        int done = 0;
+        while (done < count && !failed.get())
+        {
+            int batchCount = Math.min(CrmBehaviorBulkInserter.BATCH_SIZE, count - done);
+            List<CrmCustomerBehavior> batch = new ArrayList<>(batchCount);
+            for (int i = 0; i < batchCount; i++)
+            {
+                CrmCustomerBehavior row = new CrmCustomerBehavior();
+                row.setCustomerId((long) (random.nextInt(500) + 1));
+                String type = CrmCustomerBehaviorServiceImpl.BEHAVIOR_TYPES[
+                    random.nextInt(CrmCustomerBehaviorServiceImpl.BEHAVIOR_TYPES.length)];
+                row.setBehaviorType(type);
+                row.setDescription(type + "记录-" + (done + i + 1));
+                Calendar cal = Calendar.getInstance();
+                cal.add(Calendar.DAY_OF_YEAR, -random.nextInt(365));
+                row.setBehaviorTime(cal.getTime());
+                batch.add(row);
+            }
+            queue.put(batch);
+            done += batchCount;
+        }
+        if (failed.get())
+        {
+            throw new ServiceException(failMessage.get());
+        }
     }
 
     private boolean isEmptyRow(Row row, DataFormatter formatter)

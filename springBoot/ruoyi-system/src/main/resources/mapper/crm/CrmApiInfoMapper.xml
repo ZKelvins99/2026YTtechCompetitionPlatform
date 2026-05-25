@@ -26,6 +26,11 @@
         <include refid="selectVo"/> where id = #{id}
     </select>
 
+    <select id="selectCrmApiInfoByUrlAndMethod" resultMap="CrmApiInfoResult">
+        <include refid="selectVo"/>
+        where api_url = #{apiUrl} and upper(api_method) = upper(#{apiMethod})
+    </select>
+
     <select id="selectCrmApiInfoList" resultMap="CrmApiInfoResult">
         <include refid="selectVo"/>
         <where>

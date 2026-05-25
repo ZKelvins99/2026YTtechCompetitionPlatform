@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  id="Definitions_ContractApproval"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="ContractApproval" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_1" name="开始"/>
+    <bpmn:userTask id="Task_Submit" name="提交"/>
+    <bpmn:userTask id="Task_Dept" name="部门审批"/>
+    <bpmn:userTask id="Task_Finance" name="财务审批"/>
+    <bpmn:userTask id="Task_Archive" name="归档"/>
+    <bpmn:endEvent id="EndEvent_1" name="结束"/>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_Submit"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Submit" targetRef="Task_Dept"/>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Dept" targetRef="Task_Finance"/>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Task_Finance" targetRef="Task_Archive"/>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Task_Archive" targetRef="EndEvent_1"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="ContractApproval">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="72" y="128" width="40" height="40"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="66" y="175" width="52" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Submit_di" bpmnElement="Task_Submit">
+        <dc:Bounds x="168" y="103" width="132" height="90"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="204" y="136" width="60" height="24"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Dept_di" bpmnElement="Task_Dept">
+        <dc:Bounds x="356" y="103" width="132" height="90"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="380" y="136" width="84" height="24"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Finance_di" bpmnElement="Task_Finance">
+        <dc:Bounds x="544" y="103" width="132" height="90"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="568" y="136" width="84" height="24"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Archive_di" bpmnElement="Task_Archive">
+        <dc:Bounds x="732" y="103" width="132" height="90"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="768" y="136" width="60" height="24"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_1_di" bpmnElement="EndEvent_1">
+        <dc:Bounds x="920" y="128" width="40" height="40"/>
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="914" y="175" width="52" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <di:waypoint x="112" y="148"/>
+        <di:waypoint x="168" y="148"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <di:waypoint x="300" y="148"/>
+        <di:waypoint x="356" y="148"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <di:waypoint x="488" y="148"/>
+        <di:waypoint x="544" y="148"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <di:waypoint x="676" y="148"/>
+        <di:waypoint x="732" y="148"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <di:waypoint x="864" y="148"/>
+        <di:waypoint x="920" y="148"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

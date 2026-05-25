@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="联系人管理" description="维护客户联系人信息，支持按客户、姓名查询及完整 CRUD。" />
+    <crm-page-header title="联系人管理" v-bind="CRM_PAGE_INTRO.contact" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="联系人" prop="contactName">
@@ -96,6 +96,7 @@
 <script setup name="CrmContact">
 import { listContact, getContact, addContact, updateContact, delContact, listCustomerOptions } from '@/api/crm/contact'
 import { getCrmDict } from '@/api/crm/customer'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 

@@ -25,17 +25,24 @@
         SELECT 1 FROM DUAL
     </insert>
 
-    <select id="selectScrollList" resultMap="CrmCustomerBehaviorResult">
-        SELECT * FROM (
-            SELECT id, customer_id, behavior_type, description, behavior_time, create_time
+    <!-- 列表不查 create_time，减少回表与传输；计划仍为 PK RANGE SCAN + BY INDEX ROWID -->
+    <select id="selectScrollList" resultMap="CrmCustomerBehaviorResult" fetchSize="1000">
+        SELECT id, customer_id, behavior_type, description, behavior_time
+        FROM (
+            SELECT id, customer_id, behavior_type, description, behavior_time
             FROM crm_customer_behavior
             WHERE id &gt; #{lastId}
             ORDER BY id
-        ) WHERE ROWNUM &lt;= #{pageSize}
+        )
+        WHERE ROWNUM &lt;= #{pageSize}
+    </select>
+
+    <select id="countTotalApprox" resultType="long">
+        SELECT NVL(MAX(num_rows), 0) FROM user_tables WHERE table_name = 'CRM_CUSTOMER_BEHAVIOR'
     </select>
 
     <select id="countTotal" resultType="long">
-        select count(1) from crm_customer_behavior
+        SELECT COUNT(1) FROM crm_customer_behavior
     </select>
 
     <delete id="deleteAll">

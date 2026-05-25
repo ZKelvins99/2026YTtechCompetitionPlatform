@@ -1,5 +1,5 @@
 <template>
-  <section class="app-main">
+  <section class="app-main bg-slate-50/80">
     <router-view v-slot="{ Component, route }">
       <transition name="fade-transform" mode="out-in">
         <keep-alive :include="tagsViewStore.cachedViews">

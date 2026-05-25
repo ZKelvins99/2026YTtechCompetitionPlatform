@@ -88,10 +88,17 @@ public class CrmCustomerBehaviorController extends BaseController
         return success(task);
     }
 
+    @PreAuthorize("@ss.hasPermi('crm:behavior:import')")
+    @GetMapping("/importActive")
+    public AjaxResult activeImport()
+    {
+        return success(crmCustomerBehaviorService.getActiveImportTask());
+    }
+
     @PreAuthorize("@ss.hasPermi('crm:behavior:list')")
     @GetMapping("/scroll")
     public AjaxResult scroll(@RequestParam(required = false, defaultValue = "0") Long lastId,
-                             @RequestParam(required = false, defaultValue = "100") Integer pageSize,
+                             @RequestParam(required = false, defaultValue = "2000") Integer pageSize,
                              HttpServletResponse response)
     {
         long start = System.currentTimeMillis();
@@ -102,8 +109,15 @@ public class CrmCustomerBehaviorController extends BaseController
 
     @PreAuthorize("@ss.hasPermi('crm:behavior:list')")
     @GetMapping("/total")
-    public AjaxResult total()
+    public AjaxResult total(@RequestParam(required = false, defaultValue = "false") boolean refresh)
     {
-        return success(crmCustomerBehaviorService.countTotal());
+        if (refresh)
+        {
+            crmCustomerBehaviorService.invalidateTotalCache();
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("total", crmCustomerBehaviorService.countTotal());
+        data.put("activeImport", crmCustomerBehaviorService.getActiveImportTask());
+        return success(data);
     }
 }

@@ -52,6 +52,11 @@ public interface ICrmCustomerBehaviorService
     CrmBehaviorTaskStatus getTaskStatus(String taskId);
 
     /**
+     * 当前用户进行中的 Excel 导入任务（无则 null）
+     */
+    CrmBehaviorTaskStatus getActiveImportTask();
+
+    /**
      * keyset 分页滚动查询（无 offset 性能退化）
      * @param lastId 上一页最后一个 ID（首次传 0）
      * @param pageSize 每页条数
@@ -64,4 +69,7 @@ public interface ICrmCustomerBehaviorService
      * @return 总条数
      */
     long countTotal();
+
+    /** 清空总量缓存，下次 count 将重新精确统计 */
+    void invalidateTotalCache();
 }

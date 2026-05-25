@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="消息记录" description="查看已发消息，支持撤回与重发。" />
+    <crm-page-header title="消息记录" v-bind="CRM_PAGE_INTRO.messageRecord" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="消息标题" prop="title">
@@ -54,6 +54,7 @@
 <script setup name="CrmMessageRecord">
 import { listRecord, recallMessage, resendMessage } from '@/api/crm/message'
 import useCrmMessageStore from '@/stores/crm/message'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 const crmMessageStore = useCrmMessageStore()

@@ -1,30 +1,33 @@
 <template>
-  <div class="app-container crm-page workbench-page">
-    <crm-page-header
-      title="CRM 工作台"
-      description="拖拽布局、添加小组件、保存个性化首页；待办审批支持点击跳转办理。"
-    />
-    <div class="toolbar">
-      <el-button type="primary" icon="Plus" @click="openAdd = true">添加组件</el-button>
-      <el-button type="success" icon="Check" @click="handleSave" v-hasPermi="['crm:workbench:save']">保存布局</el-button>
-      <el-button icon="RefreshLeft" @click="handleReset">重置布局</el-button>
+  <div class="app-container crm-page workbench-page min-h-[calc(100vh-84px)] bg-gradient-to-b from-slate-50 via-brand-50/30 to-slate-50">
+    <crm-page-header title="CRM 工作台" v-bind="CRM_PAGE_INTRO.workbench" />
+    <div class="mb-4 flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
+      <el-button type="primary" icon="Plus" class="!rounded-xl" @click="openAdd = true">添加组件</el-button>
+      <el-button type="success" icon="Check" class="!rounded-xl" @click="handleSave" v-hasPermi="['crm:workbench:save']">保存布局</el-button>
+      <el-button icon="RefreshLeft" class="!rounded-xl" @click="handleReset">重置布局</el-button>
     </div>
 
     <draggable
       v-model="workbenchStore.widgets"
       item-key="id"
-      class="workbench-grid"
+      class="grid grid-cols-12 gap-4"
       :animation="200"
       handle=".widget-drag-handle"
       @end="onDragEnd"
     >
       <template #item="{ element }">
-        <div class="widget-card" :style="{ gridColumn: 'span ' + (element.w || 6) }">
-          <div class="widget-header">
-            <span class="widget-drag-handle"><el-icon><Rank /></el-icon> {{ element.title }}</span>
+        <div
+          class="tw-card tw-card-hover flex min-h-[180px] flex-col overflow-hidden"
+          :style="{ gridColumn: 'span ' + (element.w || 6) }"
+        >
+          <div class="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-brand-50/80 to-white px-4 py-3">
+            <span class="widget-drag-handle flex cursor-move items-center gap-2 text-sm font-semibold text-slate-700">
+              <el-icon class="text-brand-500"><Rank /></el-icon>
+              {{ element.title }}
+            </span>
             <el-button link type="danger" icon="Close" @click="workbenchStore.removeWidget(element.id)" />
           </div>
-          <div class="widget-body">
+          <div class="flex-1 p-4">
             <ApprovalWidget v-if="element.id === 'approval'" />
             <CustomerStatsWidget v-else-if="element.id === 'customer-stats'" />
             <OpportunityFunnelWidget v-else-if="element.id === 'opportunity-funnel'" />
@@ -36,8 +39,8 @@
       </template>
     </draggable>
 
-    <el-dialog title="添加小组件" v-model="openAdd" width="480px" append-to-body>
-      <el-table :data="addableWidgets" @row-click="handleAddWidget" highlight-current-row class="add-table">
+    <el-dialog title="添加小组件" v-model="openAdd" width="480px" append-to-body class="!rounded-2xl">
+      <el-table :data="addableWidgets" @row-click="handleAddWidget" highlight-current-row>
         <el-table-column label="组件" prop="title" />
         <el-table-column label="说明" prop="description" show-overflow-tooltip />
       </el-table>
@@ -48,6 +51,7 @@
 <script setup name="CrmWorkbench">
 import draggable from 'vuedraggable'
 import { Rank } from '@element-plus/icons-vue'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 import useCrmWorkbenchStore from '@/stores/crm/workbench'
 import ApprovalWidget from './components/ApprovalWidget.vue'
 import CustomerStatsWidget from './components/CustomerStatsWidget.vue'
@@ -91,31 +95,5 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.workbench-page { min-height: calc(100vh - 84px); }
-.toolbar { margin-bottom: 16px; display: flex; gap: 8px; }
-.workbench-grid {
-  display: grid;
-  grid-template-columns: repeat(12, 1fr);
-  gap: 16px;
-}
-.widget-card {
-  background: #fff;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  overflow: hidden;
-  min-height: 180px;
-}
-.widget-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: #f7f9fb;
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  font-weight: 600;
-  font-size: 14px;
-}
-.widget-drag-handle { cursor: move; display: flex; align-items: center; gap: 6px; }
-.widget-body { padding: 12px 14px; }
-.add-table :deep(.el-table__row) { cursor: pointer; }
+:deep(.el-table__row) { cursor: pointer; }
 </style>

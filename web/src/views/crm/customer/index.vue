@@ -1,9 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header
-      title="客户管理"
-      description="客户主数据维护，支持多条件查询、增删改查、列排序、自定义列显示与 Excel 导出。"
-    />
+    <crm-page-header title="客户管理" v-bind="CRM_PAGE_INTRO.customer" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="客户名称" prop="customerName">
@@ -140,6 +137,7 @@
 
 <script setup name="CrmCustomer">
 import { listCustomer, getCustomer, addCustomer, updateCustomer, delCustomer, getCrmDict } from '@/api/crm/customer'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 const COLUMN_STORAGE_KEY = 'crm_customer_columns'

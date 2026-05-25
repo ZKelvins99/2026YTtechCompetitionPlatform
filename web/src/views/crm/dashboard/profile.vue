@@ -1,6 +1,10 @@
 <template>
   <div class="app-container profile-page crm-page">
-    <crm-page-header title="CRM 用户画像" :description="`${userStore.nickName}（${userStore.name}）— 标签云、环形图、雷达图，业务数据变更后自动联动刷新。`">
+    <crm-page-header
+      title="用户画像"
+      :tagline="`${userStore.nickName || '当前用户'} · 业绩与分布一览`"
+      :features="CRM_PAGE_INTRO.profile.features"
+    >
       <template #extra>
         <el-button icon="Refresh" @click="loadProfile">刷新数据</el-button>
       </template>
@@ -44,6 +48,7 @@
 import * as echarts from 'echarts'
 import { getUserProfile } from '@/api/crm/profile'
 import useUserStore from '@/store/modules/user'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const userStore = useUserStore()
 const loading = ref(false)
@@ -78,16 +83,64 @@ function renderRing(data) {
   })
 }
 
+function formatContractAmount(value) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '0 元'
+  if (Math.abs(n) >= 10000) {
+    return `${(n / 10000).toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 万元`
+  }
+  return `${n.toLocaleString('zh-CN', { maximumFractionDigits: 2 })} 元`
+}
+
+function formatRadarMetricLine(metric) {
+  if (!metric) return ''
+  const name = metric.name
+  const score = metric.score ?? 0
+  if (name === '合同额') {
+    return `${name}: ${formatContractAmount(metric.value)}（得分 ${score}）`
+  }
+  if (name === '赢单率' || name === '回款率') {
+    return `${name}: ${metric.value ?? 0}%（得分 ${score}）`
+  }
+  if (name === '活跃度') {
+    return `${name}: ${metric.value ?? 0} 分（得分 ${score}）`
+  }
+  const unit = metric.unit || ''
+  return `${name}: ${metric.value ?? 0}${unit}（得分 ${score}）`
+}
+
 function renderRadar(radarChartData) {
   if (!radarChart) radarChart = echarts.init(radarChartRef.value)
   const indicator = radarChartData?.indicator || []
   const values = radarChartData?.data?.[0]?.value || [0, 0, 0, 0, 0, 0]
+  const rawMetrics = radarChartData?.rawMetrics || []
   radarChart.setOption({
-    tooltip: {},
-    radar: { indicator, radius: '60%' },
+    tooltip: {
+      trigger: 'item',
+      formatter(params) {
+        const lines = rawMetrics.length
+          ? rawMetrics.map(formatRadarMetricLine)
+          : indicator.map((item, i) => `${item.name}: 得分 ${values[i] ?? 0}`)
+        return `${params.name}<br/>${lines.join('<br/>')}`
+      }
+    },
+    radar: {
+      indicator,
+      radius: '58%',
+      splitNumber: 4,
+      axisName: { color: '#64748b' },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
+      splitArea: { areaStyle: { color: ['#fff', '#f8fafc'] } },
+      axisLine: { lineStyle: { color: '#cbd5e1' } }
+    },
     series: [{
       type: 'radar',
-      data: [{ value: values, name: '业绩指标', areaStyle: { opacity: 0.2 } }]
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2, color: '#3b82f6' },
+      itemStyle: { color: '#3b82f6' },
+      areaStyle: { color: 'rgba(59, 130, 246, 0.15)' },
+      data: [{ value: values, name: '业绩指标' }]
     }]
   })
 }

@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="消息模板" description="自定义配置消息模板，供发送页引用。" />
+    <crm-page-header title="消息模板" v-bind="CRM_PAGE_INTRO.messageTemplate" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="模板名称" prop="templateName">
@@ -94,6 +94,7 @@
 
 <script setup name="CrmMessageTemplate">
 import { listTemplate, getTemplate, addTemplate, updateTemplate, delTemplate } from '@/api/crm/message'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 

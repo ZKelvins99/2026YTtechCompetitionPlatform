@@ -1,9 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header
-      title="商机管理"
-      description="商机全生命周期跟踪；支持 Excel 批量导入、格式校验、重复去重与错误行定位提示。"
-    />
+    <crm-page-header title="商机管理" v-bind="CRM_PAGE_INTRO.opportunity" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="商机名称" prop="opportunityName">
@@ -122,6 +119,20 @@
         </template>
       </el-upload>
 
+      <el-alert
+        class="import-prep-alert"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="样例 Excel 要求客户名称在系统中已存在"
+        description="若提示「客户名称不存在：CRM导入测试客户A/B/C」，请先点击下方按钮创建测试客户，再重新导入。"
+      />
+      <div class="import-prep-actions">
+        <el-button type="warning" plain icon="User" :loading="seedLoading" @click="handleSeedCustomers">
+          一键创建导入测试客户（A/B/C）
+        </el-button>
+      </div>
+
       <div v-if="importResult" class="import-result-panel">
         <el-row :gutter="16" class="summary-cards">
           <el-col :span="8">
@@ -170,8 +181,9 @@
 
 <script setup name="CrmOpportunity">
 import { UploadFilled } from '@element-plus/icons-vue'
-import { listOpportunity, getOpportunity, addOpportunity, updateOpportunity, delOpportunity, importOpportunity } from '@/api/crm/opportunity'
+import { listOpportunity, getOpportunity, addOpportunity, updateOpportunity, delOpportunity, importOpportunity, seedOpportunityImportCustomers } from '@/api/crm/opportunity'
 import { getCrmDict } from '@/api/crm/customer'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 import { listCustomerOptions } from '@/api/crm/contact'
 
 const { proxy } = getCurrentInstance()
@@ -182,6 +194,7 @@ const stageOptions = ref([])
 const open = ref(false)
 const importOpen = ref(false)
 const importLoading = ref(false)
+const seedLoading = ref(false)
 const importResult = ref(null)
 const selectedFile = ref(null)
 const loading = ref(true)
@@ -316,6 +329,15 @@ function downloadTemplate() {
   proxy.download('crm/opportunity/importTemplate', {}, `opportunity_template_${Date.now()}.xlsx`)
 }
 
+function handleSeedCustomers() {
+  seedLoading.value = true
+  seedOpportunityImportCustomers().then(res => {
+    proxy.$modal.msgSuccess(res.msg || res.data || '测试客户已就绪')
+  }).finally(() => {
+    seedLoading.value = false
+  })
+}
+
 function submitImport() {
   if (!selectedFile.value) {
     proxy.$modal.msgError('请选择 xls 或 xlsx 文件')
@@ -350,6 +372,13 @@ getList()
 </script>
 
 <style scoped>
+.import-prep-alert {
+  margin-top: 12px;
+}
+.import-prep-actions {
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
 .import-result-panel {
   margin-top: 16px;
 }

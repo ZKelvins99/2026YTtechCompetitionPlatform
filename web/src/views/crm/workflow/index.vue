@@ -1,14 +1,32 @@
 <template>
-  <div class="app-container workflow-page">
+  <div class="app-container workflow-page" v-loading="pageLoading">
     <el-card shadow="never" class="bpmn-card">
       <template #header>
-        <span>合同审批流程 — {{ instance.businessNo }}</span>
+        <span>合同审批流程 — {{ instance.businessNo || '加载中' }}</span>
         <el-tag class="ml-2" :type="instanceStatusType">{{ instanceStatusText }}</el-tag>
       </template>
-      <div ref="bpmnContainer" class="bpmn-container"></div>
+      <el-alert v-if="bpmnError" :title="bpmnError" type="warning" show-icon :closable="false" class="mb-2" />
+      <div class="bpmn-viewport">
+        <div ref="bpmnContainer" class="bpmn-container"></div>
+      </div>
+      <div class="bpmn-legend">
+        <span class="legend-item legend-pass">已通过</span>
+        <span class="legend-item legend-current">当前节点</span>
+        <span class="legend-item legend-pending">待处理</span>
+        <span class="legend-item legend-reject">驳回</span>
+      </div>
     </el-card>
 
-    <el-card v-if="instance.status === '0'" shadow="never" class="action-card">
+    <el-alert
+      v-if="instance.status === '0' && !instance.canOperate"
+      type="info"
+      show-icon
+      :closable="false"
+      class="mb-3"
+      title="当前节点待指定审批人处理；系统管理员可代为审批。"
+    />
+
+    <el-card v-if="instance.status === '0' && instance.canOperate" shadow="never" class="action-card">
       <el-form label-width="80px">
         <el-form-item label="审批意见">
           <el-input v-model="opinion" type="textarea" :rows="3" placeholder="请输入审批意见" />
@@ -41,7 +59,7 @@
           :timestamp="parseTime(node.approveTime) || '待处理'"
           placement="top"
         >
-          <p><strong>{{ node.nodeName }}</strong> — {{ node.approverName || '未指定' }}</p>
+          <p><strong>{{ node.nodeName }}</strong> — {{ approverLabel(node) }}</p>
           <p>{{ actionText(node.status) }} {{ node.opinion ? '：' + node.opinion : '' }}</p>
         </el-timeline-item>
       </el-timeline>
@@ -68,11 +86,13 @@
 </template>
 
 <script setup name="CrmWorkflow">
+import { nextTick } from 'vue'
 import BpmnViewer from 'bpmn-js/lib/Viewer'
 import 'bpmn-js/dist/assets/diagram-js.css'
 import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listUser } from '@/api/system/user'
+import { resolveWorkflowBpmnXml } from '@/constants/contractApprovalBpmn'
 import {
   getWorkflowInstance, getWorkflowBpmn, approveWorkflow, rejectWorkflow,
   countersignWorkflow, transferWorkflow, rollbackWorkflow, terminateWorkflow
@@ -83,13 +103,15 @@ const { proxy } = getCurrentInstance()
 
 const instanceId = computed(() => route.params.instanceId)
 const bpmnContainer = ref(null)
-const instance = ref({ nodes: [], status: '0' })
+const instance = ref({ nodes: [], status: '0', canOperate: false })
 const opinion = ref('')
 const openCountersign = ref(false)
 const openTransfer = ref(false)
 const countersignUsers = ref([])
 const transferUserId = ref(null)
 const userList = ref([])
+const pageLoading = ref(false)
+const bpmnError = ref('')
 let viewer = null
 
 const instanceStatusText = computed(() => ({ '0': '审批中', '1': '已完成', '2': '已终止' }[instance.value.status] || ''))
@@ -100,26 +122,73 @@ const rollbackNodes = computed(() => (instance.value.nodes || []).filter(n => n.
 function actionText(status) {
   return { '0': '待审批', '1': '通过', '2': '驳回', '3': '转办', '4': '回退' }[status] || ''
 }
+function approverLabel(node) {
+  if (node.approverName) return node.approverName
+  if (node.status === '1' || node.status === '2') return '管理员代审'
+  return '未指定'
+}
 function timelineType(status) {
   return { '1': 'success', '2': 'danger', '3': 'warning', '4': 'info' }[status] || 'primary'
 }
 
 async function loadData() {
-  const [instRes, bpmnRes] = await Promise.all([
-    getWorkflowInstance(instanceId.value),
-    getWorkflowBpmn(instanceId.value)
-  ])
-  instance.value = instRes.data
-  await renderBpmn(bpmnRes.data)
+  pageLoading.value = true
+  bpmnError.value = ''
+  try {
+    const instRes = await getWorkflowInstance(instanceId.value)
+    instance.value = instRes.data || { nodes: [], status: '0' }
+    let bpmnRes = null
+    try {
+      bpmnRes = await getWorkflowBpmn(instanceId.value)
+    } catch (e) {
+      console.warn('BPMN 接口不可用，使用实例内嵌或本地模板', e)
+    }
+    const xml = resolveWorkflowBpmnXml(instance.value, bpmnRes)
+    await renderBpmn(xml)
+  } catch (e) {
+    bpmnError.value = e?.message || '加载流程失败'
+  } finally {
+    pageLoading.value = false
+  }
 }
 
 async function renderBpmn(xml) {
-  if (viewer) { viewer.destroy(); viewer = null }
-  viewer = new BpmnViewer({ container: bpmnContainer.value })
-  await viewer.importXML(xml)
-  applyNodeColors()
+  if (viewer) {
+    viewer.destroy()
+    viewer = null
+  }
+  await nextTick()
+  if (!bpmnContainer.value) return
+  if (!xml || !String(xml).includes('bpmn:definitions')) {
+    bpmnError.value = '未获取到流程图数据'
+    return
+  }
+  try {
+    viewer = new BpmnViewer({ container: bpmnContainer.value })
+    const { warnings } = await viewer.importXML(xml)
+    if (warnings?.length) {
+      console.warn('BPMN import warnings', warnings)
+    }
+    applyNodeColors()
+    fitDiagramViewport()
+  } catch (e) {
+    console.error(e)
+    bpmnError.value = '流程图渲染失败，请刷新重试'
+  }
+}
+
+function fitDiagramViewport() {
   const canvas = viewer.get('canvas')
+  canvas.resized()
   canvas.zoom('fit-viewport')
+  const vb = canvas.viewbox()
+  const pad = 48
+  canvas.viewbox({
+    x: vb.x - pad,
+    y: vb.y - pad,
+    width: vb.width + pad * 2,
+    height: vb.height + pad * 2
+  })
 }
 
 function applyNodeColors() {
@@ -128,13 +197,19 @@ function applyNodeColors() {
   const registry = viewer.get('elementRegistry')
   const orderStatus = {}
   instance.value.nodes.forEach(n => {
-    const id = n.bpmnElementId
-    if (!id) return
+    if (!n.bpmnElementId) return
     const cur = orderStatus[n.nodeOrder] || 'pending'
     if (n.status === '2') orderStatus[n.nodeOrder] = 'reject'
     else if (n.status === '1' && cur !== 'reject') orderStatus[n.nodeOrder] = 'pass'
-    else if (n.id === instance.value.currentNodeId) orderStatus[n.nodeOrder] = 'current'
+    else if (instance.value.status === '0' && n.id === instance.value.currentNodeId) {
+      orderStatus[n.nodeOrder] = 'current'
+    }
   })
+  if (instance.value.status === '1') {
+    for (let i = 1; i <= 4; i++) {
+      if (orderStatus[i] !== 'reject') orderStatus[i] = 'pass'
+    }
+  }
   const bpmnIds = ['Task_Submit', 'Task_Dept', 'Task_Finance', 'Task_Archive']
   bpmnIds.forEach((id, idx) => {
     const el = registry.get(id)
@@ -188,11 +263,83 @@ onBeforeUnmount(() => { if (viewer) viewer.destroy() })
 </script>
 
 <style scoped>
-.workflow-page .bpmn-container { height: 280px; }
 .bpmn-card, .action-card, .timeline-card { margin-bottom: 16px; }
 .ml-2 { margin-left: 8px; }
-:deep(.highlight-green .djs-visual > :nth-child(1)) { stroke: #67c23a !important; fill: #f0f9eb !important; }
-:deep(.highlight-blue .djs-visual > :nth-child(1)) { stroke: #409eff !important; fill: #ecf5ff !important; }
-:deep(.highlight-red .djs-visual > :nth-child(1)) { stroke: #f56c6c !important; fill: #fef0f0 !important; }
-:deep(.highlight-gray .djs-visual > :nth-child(1)) { stroke: #dcdfe6 !important; fill: #f5f7fa !important; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+
+.bpmn-viewport {
+  border-radius: 10px;
+  border: 1px solid #e4e7ed;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  overflow: hidden;
+}
+.workflow-page .bpmn-container {
+  height: 400px;
+  min-height: 280px;
+}
+
+.bpmn-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #e4e7ed;
+  font-size: 12px;
+  color: #606266;
+}
+.legend-item::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -2px;
+  border: 2px solid transparent;
+}
+.legend-pass::before { background: #f0f9eb; border-color: #67c23a; }
+.legend-current::before { background: #ecf5ff; border-color: #409eff; }
+.legend-pending::before { background: #f5f7fa; border-color: #dcdfe6; }
+.legend-reject::before { background: #fef0f0; border-color: #f56c6c; }
+
+:deep(.bpmn-container .djs-container) {
+  background: transparent !important;
+}
+:deep(.bpmn-container .djs-element .djs-label) {
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  fill: #303133 !important;
+}
+:deep(.bpmn-container .djs-connection .djs-visual > path) {
+  stroke: #94a3b8 !important;
+  stroke-width: 2px !important;
+}
+:deep(.bpmn-container .djs-visual circle) {
+  stroke-width: 2px !important;
+}
+
+:deep(.highlight-green .djs-visual rect),
+:deep(.highlight-green .djs-visual circle) {
+  stroke: #67c23a !important;
+  fill: #f0f9eb !important;
+}
+:deep(.highlight-blue .djs-visual rect),
+:deep(.highlight-blue .djs-visual circle) {
+  stroke: #409eff !important;
+  fill: #ecf5ff !important;
+  stroke-width: 2.5px !important;
+}
+:deep(.highlight-red .djs-visual rect),
+:deep(.highlight-red .djs-visual circle) {
+  stroke: #f56c6c !important;
+  fill: #fef0f0 !important;
+}
+:deep(.highlight-gray .djs-visual rect),
+:deep(.highlight-gray .djs-visual circle) {
+  stroke: #c0c4cc !important;
+  fill: #ffffff !important;
+}
 </style>

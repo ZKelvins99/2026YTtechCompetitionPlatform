@@ -17,7 +17,7 @@
         <div class="bullshit__info">
           对不起，您正在寻找的页面不存在。尝试检查URL的错误，然后按浏览器上的刷新按钮或尝试在我们的应用程序中找到其他内容。
         </div>
-        <router-link to="/index" class="bullshit__return-home">
+        <router-link to="/index" class="bullshit__return-home inline-flex items-center justify-center rounded-full bg-gradient-to-r from-brand-600 to-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-md shadow-brand-500/30 transition hover:from-brand-700 hover:to-brand-600">
           返回首页
         </router-link>
       </div>

@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="合同管理" description="合同起草与状态管理，支持发起工作流审批并跳转流程办理页。" />
+    <crm-page-header title="合同管理" v-bind="CRM_PAGE_INTRO.contract" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true">
       <el-form-item label="合同名称" prop="contractName">
@@ -62,6 +62,33 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     </el-card>
 
+    <el-dialog title="发起合同审批" v-model="approvalOpen" width="520px" append-to-body>
+      <el-form ref="approvalRef" :model="approvalForm" :rules="approvalRules" label-width="110px">
+        <el-form-item label="合同">
+          <span>{{ approvalContractName }}</span>
+        </el-form-item>
+        <el-form-item label="部门审批人" prop="deptApproverId">
+          <el-select v-model="approvalForm.deptApproverId" filterable placeholder="请选择部门审批人" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="财务审批人" prop="financeApproverId">
+          <el-select v-model="approvalForm.financeApproverId" filterable placeholder="请选择财务审批人" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="归档审批人" prop="archiveApproverId">
+          <el-select v-model="approvalForm.archiveApproverId" filterable placeholder="请选择归档审批人" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button type="primary" :loading="approvalSubmitting" @click="submitStartApproval">确 定</el-button>
+        <el-button @click="approvalOpen = false">取 消</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog :title="title" v-model="open" width="640px" append-to-body>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="合同名称" prop="contractName">
@@ -99,8 +126,10 @@
 <script setup name="CrmContract">
 import { listContract, getContract, addContract, updateContract, delContract } from '@/api/crm/contract'
 import { getCrmDict } from '@/api/crm/customer'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 import { listCustomerOptions } from '@/api/crm/contact'
 import { startWorkflow } from '@/api/crm/workflow'
+import { listUser } from '@/api/system/user'
 
 const { proxy } = getCurrentInstance()
 const router = useRouter()
@@ -115,6 +144,21 @@ const title = ref('')
 const ids = ref([])
 const multiple = ref(true)
 const total = ref(0)
+const approvalOpen = ref(false)
+const approvalSubmitting = ref(false)
+const approvalContractName = ref('')
+const approvalContractId = ref(null)
+const userOptions = ref([])
+const approvalForm = ref({
+  deptApproverId: undefined,
+  financeApproverId: undefined,
+  archiveApproverId: undefined
+})
+const approvalRules = {
+  deptApproverId: [{ required: true, message: '请选择部门审批人', trigger: 'change' }],
+  financeApproverId: [{ required: true, message: '请选择财务审批人', trigger: 'change' }],
+  archiveApproverId: [{ required: true, message: '请选择归档审批人', trigger: 'change' }]
+}
 
 const data = reactive({
   form: {},
@@ -170,14 +214,37 @@ function handleDelete(row) {
   const delIds = row?.id || ids.value
   proxy.$modal.confirm('是否确认删除？').then(() => delContract(delIds)).then(() => { getList(); proxy.$modal.msgSuccess('删除成功') }).catch(() => {})
 }
+function loadUserOptions() {
+  if (userOptions.value.length) return
+  listUser({ pageNum: 1, pageSize: 200, status: '0' }).then(res => {
+    userOptions.value = res.rows || []
+  })
+}
+
 function handleStartApproval(row) {
-  proxy.$modal.confirm(`确认发起合同「${row.contractName}」的审批流程？`).then(() => {
-    return startWorkflow({ contractId: row.id })
-  }).then(res => {
-    proxy.$modal.msgSuccess('审批流程已发起')
-    getList()
-    goWorkflow(res.data.id)
-  }).catch(() => {})
+  loadUserOptions()
+  approvalContractId.value = row.id
+  approvalContractName.value = row.contractName
+  approvalForm.value = { deptApproverId: undefined, financeApproverId: undefined, archiveApproverId: undefined }
+  approvalOpen.value = true
+}
+
+function submitStartApproval() {
+  proxy.$refs.approvalRef.validate(valid => {
+    if (!valid) return
+    approvalSubmitting.value = true
+    startWorkflow({
+      contractId: approvalContractId.value,
+      deptApproverId: approvalForm.value.deptApproverId,
+      financeApproverId: approvalForm.value.financeApproverId,
+      archiveApproverId: approvalForm.value.archiveApproverId
+    }).then(res => {
+      proxy.$modal.msgSuccess('审批流程已发起')
+      approvalOpen.value = false
+      getList()
+      goWorkflow(res.data.id)
+    }).finally(() => { approvalSubmitting.value = false })
+  })
 }
 function goWorkflow(instanceId) {
   router.push('/crm/workflow/index/' + instanceId)

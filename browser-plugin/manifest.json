@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CRM 智能表单助手",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "description": "CRM 表单多字段校验、模板保存与一键自动填充 —— 比武项目 2.8 得分点",
   "icons": {
     "48": "icons/icon.svg"

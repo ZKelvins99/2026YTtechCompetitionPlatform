@@ -28,3 +28,11 @@ export function importOpportunity(data) {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
 }
+
+/** 创建 Excel 样例所需的测试客户（CRM导入测试客户A/B/C） */
+export function seedOpportunityImportCustomers() {
+  return request({
+    url: '/crm/opportunity/seedImportCustomers',
+    method: 'post'
+  })
+}

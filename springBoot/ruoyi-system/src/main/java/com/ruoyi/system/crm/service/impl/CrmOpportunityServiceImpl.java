@@ -90,6 +90,60 @@ public class CrmOpportunityServiceImpl implements ICrmOpportunityService
         return rows;
     }
 
+    /** 与 data/opportunity-import/*.xlsx 中「客户名称」列一致 */
+    private static final String[][] IMPORT_TEST_CUSTOMERS = {
+        { "IMP-TEST-A", "CRM导入测试客户A", "2", "信息技术" },
+        { "IMP-TEST-B", "CRM导入测试客户B", "2", "智能制造" },
+        { "IMP-TEST-C", "CRM导入测试客户C", "3", "贸易" }
+    };
+
+    @Override
+    public String seedImportTestCustomers(String operName)
+    {
+        int created = 0;
+        int skipped = 0;
+        StringBuilder names = new StringBuilder();
+        for (String[] seed : IMPORT_TEST_CUSTOMERS)
+        {
+            String customerName = seed[1];
+            if (crmCustomerMapper.selectCrmCustomerByName(customerName) != null)
+            {
+                skipped++;
+                continue;
+            }
+            CrmCustomer customer = new CrmCustomer();
+            customer.setCustomerNo(seed[0]);
+            customer.setCustomerName(customerName);
+            customer.setLevelId(Long.parseLong(seed[2]));
+            customer.setIndustry(seed[3]);
+            customer.setCreateBy(operName);
+            crmCustomerMapper.insertCrmCustomer(customer);
+            created++;
+            if (names.length() > 0)
+            {
+                names.append("、");
+            }
+            names.append(customerName);
+        }
+        if (created > 0)
+        {
+            profileRefreshHelper.refreshCurrentUser();
+        }
+        if (created == 0 && skipped == IMPORT_TEST_CUSTOMERS.length)
+        {
+            return "测试客户已存在，可直接导入样例 Excel（CRM导入测试客户A/B/C）";
+        }
+        if (created > 0 && skipped > 0)
+        {
+            return "已新建 " + created + " 个测试客户（" + names + "），另有 " + skipped + " 个已存在";
+        }
+        if (created > 0)
+        {
+            return "已新建 " + created + " 个测试客户：" + names;
+        }
+        return "未创建新客户";
+    }
+
     @Override
     public CrmImportResult importOpportunity(InputStream inputStream, String operName)
     {

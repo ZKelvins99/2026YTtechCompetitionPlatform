@@ -1,8 +1,5 @@
-/* ============================================================
-   CRM 智能表单助手 — 注入样式
-   ============================================================ */
+/* CRM 智能表单助手 — 注入样式 */
 
-/* ---- 浮動工具欄 ---- */
 .crm-fp-toolbar {
   position: fixed;
   top: 80px;
@@ -10,43 +7,116 @@
   z-index: 99999;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   background: #fff;
   border: 1px solid #e4e7ed;
   border-radius: 10px;
-  padding: 10px 8px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-  transition: transform 0.2s, opacity 0.2s;
+  padding: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
+  transition: opacity 0.2s, box-shadow 0.2s;
+  min-width: 132px;
+  max-width: 160px;
+  user-select: none;
 }
+
 .crm-fp-toolbar.crm-fp-hidden {
-  transform: translateX(120%);
   opacity: 0;
   pointer-events: none;
+  transform: translateX(8px);
 }
+
+.crm-fp-toolbar.crm-fp-dragging {
+  box-shadow: 0 8px 28px rgba(64, 158, 255, 0.35);
+  cursor: grabbing;
+}
+
+.crm-fp-drag-handle {
+  cursor: grab;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1;
+  color: #909399;
+  padding: 8px 8px 4px;
+  letter-spacing: 2px;
+  border-radius: 10px 10px 0 0;
+  background: linear-gradient(180deg, #f5f7fa 0%, #fff 100%);
+}
+
+.crm-fp-drag-handle:active {
+  cursor: grabbing;
+}
+
+.crm-fp-toolbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.crm-fp-toolbar-label {
+  font-size: 11px;
+  color: #606266;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.crm-fp-mini-btn {
+  border: none;
+  background: #f5f7fa;
+  color: #909399;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+.crm-fp-mini-btn:hover {
+  background: #e4e7ed;
+  color: #303133;
+}
+
+.crm-fp-toolbar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+}
+
+.crm-fp-toolbar.crm-fp-collapsed .crm-fp-toolbar-body {
+  display: none;
+}
+
 .crm-fp-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
+  padding: 7px 10px;
+  font-size: 12px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, box-shadow 0.15s;
+  transition: background 0.15s;
 }
-.crm-fp-btn:active { transform: scale(0.97); }
+
+.crm-fp-btn:active {
+  transform: scale(0.97);
+}
+
 .crm-fp-btn-primary { background: #409eff; color: #fff; }
 .crm-fp-btn-primary:hover { background: #66b1ff; }
 .crm-fp-btn-success { background: #67c23a; color: #fff; }
 .crm-fp-btn-success:hover { background: #85ce61; }
 .crm-fp-btn-warning { background: #e6a23c; color: #fff; }
 .crm-fp-btn-warning:hover { background: #ebb563; }
-.crm-fp-btn-danger { background: #f56c6c; color: #fff; }
-.crm-fp-btn-danger:hover { background: #f78989; }
 
-/* ---- 校验结果浮層 ---- */
 .crm-fp-overlay {
   position: fixed;
   inset: 0;
@@ -54,13 +124,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0,0,0,0.35);
+  background: rgba(0, 0, 0, 0.35);
   animation: crm-fp-fadeIn 0.15s;
 }
+
 @keyframes crm-fp-fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
 .crm-fp-modal {
   background: #fff;
   border-radius: 10px;
@@ -69,13 +141,15 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.18);
   animation: crm-fp-slideIn 0.2s;
 }
+
 @keyframes crm-fp-slideIn {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
 .crm-fp-modal-header {
   display: flex;
   justify-content: space-between;
@@ -86,6 +160,7 @@
   font-weight: 600;
   color: #303133;
 }
+
 .crm-fp-modal-close {
   background: none;
   border: none;
@@ -95,12 +170,18 @@
   padding: 4px;
   border-radius: 4px;
 }
-.crm-fp-modal-close:hover { background: #f5f7fa; color: #303133; }
+
+.crm-fp-modal-close:hover {
+  background: #f5f7fa;
+  color: #303133;
+}
+
 .crm-fp-modal-body {
   padding: 16px 20px;
   overflow-y: auto;
   flex: 1;
 }
+
 .crm-fp-modal-footer {
   padding: 12px 20px 16px;
   border-top: 1px solid #ebeef5;
@@ -109,8 +190,8 @@
   gap: 8px;
 }
 
-/* 校验结果項目 */
 .crm-fp-result-list { list-style: none; margin: 0; padding: 0; }
+
 .crm-fp-result-item {
   display: flex;
   align-items: flex-start;
@@ -120,7 +201,9 @@
   font-size: 14px;
   line-height: 1.5;
 }
+
 .crm-fp-result-item:last-child { border-bottom: none; }
+
 .crm-fp-result-icon {
   flex-shrink: 0;
   width: 22px;
@@ -134,6 +217,7 @@
   color: #fff;
   margin-top: 1px;
 }
+
 .crm-fp-result-icon.pass { background: #67c23a; }
 .crm-fp-result-icon.fail { background: #f56c6c; }
 .crm-fp-result-icon.skip { background: #909399; }
@@ -141,34 +225,36 @@
 .crm-fp-result-value { color: #606266; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crm-fp-result-msg { color: #909399; font-size: 13px; }
 
-/* 汇总行 */
 .crm-fp-summary {
   display: flex;
   gap: 16px;
+  flex-wrap: wrap;
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 6px;
   margin-bottom: 12px;
   font-size: 13px;
 }
-.crm-fp-summary span { display: flex; align-items: center; gap: 4px; }
+
 .crm-fp-summary .num-pass { color: #67c23a; font-weight: bold; }
 .crm-fp-summary .num-fail { color: #f56c6c; font-weight: bold; }
 .crm-fp-summary .num-total { color: #303133; font-weight: bold; }
 
-/* ---- 模板管理 ---- */
 .crm-fp-template-list { list-style: none; margin: 0; padding: 0; }
+
 .crm-fp-template-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 12px 14px;
   border-bottom: 1px solid #f0f0f0;
 }
-.crm-fp-template-item:last-child { border-bottom: none; }
+
 .crm-fp-template-name { font-size: 14px; font-weight: 500; color: #303133; }
 .crm-fp-template-meta { font-size: 12px; color: #909399; margin-top: 2px; }
-.crm-fp-template-actions { display: flex; gap: 6px; }
+.crm-fp-template-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
 .crm-fp-template-btn {
   padding: 4px 10px;
   font-size: 12px;
@@ -176,10 +262,9 @@
   border: none;
   cursor: pointer;
 }
+
 .crm-fp-template-btn.fill { background: #409eff; color: #fff; }
-.crm-fp-template-btn.fill:hover { background: #66b1ff; }
 .crm-fp-template-btn.del { background: #f56c6c; color: #fff; }
-.crm-fp-template-btn.del:hover { background: #f78989; }
 
 .crm-fp-empty {
   text-align: center;
@@ -188,32 +273,17 @@
   font-size: 14px;
 }
 
-/* 保存模板输入框 */
-.crm-fp-save-input {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
 .crm-fp-save-input input {
-  flex: 1;
+  width: 100%;
   height: 34px;
   border: 1px solid #dcdfe6;
   border-radius: 6px;
   padding: 0 12px;
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
+  box-sizing: border-box;
 }
-.crm-fp-save-input input:focus { border-color: #409eff; }
 
-/* 浮动工具栏的拖动条 */
-.crm-fp-toolbar-label {
-  font-size: 11px;
-  color: #909399;
-  text-align: center;
-  padding: 2px 0 4px;
-  border-bottom: 1px solid #f0f0f0;
-  margin-bottom: 4px;
-  letter-spacing: 0.5px;
-  user-select: none;
+.crm-fp-save-input input:focus {
+  border-color: #409eff;
 }

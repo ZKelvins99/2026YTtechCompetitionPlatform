@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="CRM 操作日志" description="全量接口审计：入参出参、操作人、TraceId 链路及 SQL 语句追踪。" />
+    <crm-page-header title="操作日志" v-bind="CRM_PAGE_INTRO.operlog" />
     <el-card shadow="never" class="crm-panel crm-search-panel" v-show="showSearch">
     <el-form :model="queryParams" ref="queryRef" :inline="true" label-width="80px">
       <el-form-item label="操作人" prop="operator">
@@ -93,6 +93,7 @@
 
 <script setup name="CrmOperlog">
 import { listOperlog, getOperlog } from '@/api/crm/operlog'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 

@@ -1,6 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header title="发送消息" description="引用已有模板，选择接收人并完成消息发送。" />
+    <crm-page-header title="发送消息" v-bind="CRM_PAGE_INTRO.messageSend" />
     <el-card shadow="never" class="crm-panel">
       <template #header><span>发送 CRM 消息</span></template>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="max-width: 720px">
@@ -43,6 +43,7 @@
 import { getSendTemplateList, sendMessage } from '@/api/crm/message'
 import { listUser } from '@/api/system/user'
 import useCrmMessageStore from '@/stores/crm/message'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 const crmMessageStore = useCrmMessageStore()

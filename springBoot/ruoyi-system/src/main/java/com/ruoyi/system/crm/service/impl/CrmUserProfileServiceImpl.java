@@ -4,12 +4,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.ruoyi.common.core.domain.entity.SysUser;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
@@ -21,6 +23,14 @@ import com.ruoyi.system.service.ISysUserService;
 @Service
 public class CrmUserProfileServiceImpl implements ICrmUserProfileService
 {
+    private static final String[] RADAR_NAMES = { "客户数", "商机数", "合同额", "赢单率", "活跃度", "回款率" };
+
+    /** 雷达满分对应的业务目标（用于归一化到 0–100，与量纲无关） */
+    private static final double TARGET_CUSTOMER = 50;
+    private static final double TARGET_OPPORTUNITY = 30;
+    /** 合同额 100 万元视为雷达满分 */
+    private static final double TARGET_CONTRACT_AMOUNT = 1_000_000;
+
     @Autowired
     private CrmUserProfileMapper crmUserProfileMapper;
 
@@ -36,7 +46,8 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
         {
             throw new ServiceException("用户画像数据不存在");
         }
-        return buildChartData(profile);
+        SysUser user = sysUserService.selectUserById(userId);
+        return buildChartData(profile, user != null ? user.getUserName() : null);
     }
 
     @Override
@@ -69,14 +80,13 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
         List<Map<String, Object>> industryStats = normalizeStats(crmUserProfileMapper.selectIndustryStats(createBy));
         List<Map<String, Object>> stageStats = normalizeStats(crmUserProfileMapper.selectStageStats(createBy));
 
-        List<Integer> radarValues = List.of(
-            customerCount,
-            opportunityCount,
-            totalAmount.setScale(0, RoundingMode.HALF_UP).intValue(),
-            (int) Math.round(winRate),
-            activityScore,
-            (int) Math.round(paymentRate)
-        );
+        Map<String, Object> radarMetrics = new LinkedHashMap<>();
+        radarMetrics.put("customerCount", customerCount);
+        radarMetrics.put("opportunityCount", opportunityCount);
+        radarMetrics.put("contractAmount", totalAmount);
+        radarMetrics.put("winRate", round1(winRate));
+        radarMetrics.put("activityScore", activityScore);
+        radarMetrics.put("paymentRate", round1(paymentRate));
 
         CrmUserProfile profile = new CrmUserProfile();
         profile.setUserId(userId);
@@ -86,7 +96,7 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
         profile.setTotalAmount(totalAmount);
         profile.setIndustryDistribution(JSON.toJSONString(industryStats));
         profile.setRegionDistribution(JSON.toJSONString(stageStats));
-        profile.setMonthlyPerformance(JSON.toJSONString(radarValues));
+        profile.setMonthlyPerformance(JSON.toJSONString(radarMetrics));
 
         CrmUserProfile existing = crmUserProfileMapper.selectByUserId(userId);
         if (existing == null)
@@ -116,28 +126,12 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
         }
     }
 
-    private Map<String, Object> buildChartData(CrmUserProfile profile)
+    private Map<String, Object> buildChartData(CrmUserProfile profile, String createBy)
     {
         Map<String, Object> data = new HashMap<>();
         data.put("tagCloud", parseJsonArray(profile.getIndustryDistribution()));
         data.put("ringChart", parseJsonArray(profile.getRegionDistribution()));
-
-        List<Integer> values = JSON.parseArray(profile.getMonthlyPerformance(), Integer.class);
-        if (values == null || values.size() < 6)
-        {
-            values = List.of(0, 0, 0, 0, 0, 0);
-        }
-        Map<String, Object> radarChart = new HashMap<>();
-        radarChart.put("indicator", List.of(
-            Map.of("name", "客户数", "max", 100),
-            Map.of("name", "商机数", "max", 50),
-            Map.of("name", "合同额", "max", 1000),
-            Map.of("name", "赢单率", "max", 100),
-            Map.of("name", "活跃度", "max", 100),
-            Map.of("name", "回款率", "max", 100)
-        ));
-        radarChart.put("data", List.of(Map.of("value", values)));
-        data.put("radarChart", radarChart);
+        data.put("radarChart", buildRadarChart(profile, createBy));
         data.put("summary", Map.of(
             "customerCount", profile.getCustomerCount(),
             "opportunityCount", profile.getOpportunityCount(),
@@ -145,6 +139,132 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
             "totalAmount", profile.getTotalAmount()
         ));
         return data;
+    }
+
+    private Map<String, Object> buildRadarChart(CrmUserProfile profile, String createBy)
+    {
+        RadarMetrics metrics = resolveRadarMetrics(profile, createBy);
+
+        List<Map<String, Object>> indicators = new ArrayList<>();
+        List<Number> scores = new ArrayList<>();
+        List<Map<String, Object>> rawMetrics = new ArrayList<>();
+
+        addRadarDimension(indicators, scores, rawMetrics, 0, metrics.customerCount, TARGET_CUSTOMER, "家");
+        addRadarDimension(indicators, scores, rawMetrics, 1, metrics.opportunityCount, TARGET_OPPORTUNITY, "个");
+        addRadarDimension(indicators, scores, rawMetrics, 2, metrics.contractAmount, TARGET_CONTRACT_AMOUNT, "元");
+        addRadarDimension(indicators, scores, rawMetrics, 3, metrics.winRate, 100, "%");
+        addRadarDimension(indicators, scores, rawMetrics, 4, metrics.activityScore, 100, "分");
+        addRadarDimension(indicators, scores, rawMetrics, 5, metrics.paymentRate, 100, "%");
+
+        Map<String, Object> radarChart = new HashMap<>();
+        radarChart.put("indicator", indicators);
+        radarChart.put("data", List.of(Map.of("value", scores)));
+        radarChart.put("rawMetrics", rawMetrics);
+        return radarChart;
+    }
+
+    private void addRadarDimension(List<Map<String, Object>> indicators, List<Number> scores,
+        List<Map<String, Object>> rawMetrics, int index, double rawValue, double targetFullScore, String unit)
+    {
+        indicators.add(Map.of("name", RADAR_NAMES[index], "max", 100));
+        double score = normalizeToScore(rawValue, targetFullScore);
+        scores.add(round1(score));
+        Map<String, Object> raw = new HashMap<>();
+        raw.put("name", RADAR_NAMES[index]);
+        raw.put("value", formatRawValue(index, rawValue));
+        raw.put("unit", unit);
+        raw.put("score", round1(score));
+        rawMetrics.add(raw);
+    }
+
+    private RadarMetrics resolveRadarMetrics(CrmUserProfile profile, String createBy)
+    {
+        RadarMetrics metrics = new RadarMetrics();
+        metrics.customerCount = safeLong(profile.getCustomerCount());
+        metrics.opportunityCount = safeLong(profile.getOpportunityCount());
+        metrics.contractAmount = profile.getTotalAmount() != null
+            ? profile.getTotalAmount().doubleValue() : 0;
+        metrics.winRate = profile.getWinRate() != null ? profile.getWinRate().doubleValue() : 0;
+
+        if (StringUtils.isNotEmpty(profile.getMonthlyPerformance()))
+        {
+            try
+            {
+                JSONObject json = JSON.parseObject(profile.getMonthlyPerformance());
+                if (json != null && json.containsKey("customerCount"))
+                {
+                    metrics.customerCount = json.getDoubleValue("customerCount");
+                    metrics.opportunityCount = json.getDoubleValue("opportunityCount");
+                    Object amount = json.get("contractAmount");
+                    if (amount instanceof BigDecimal)
+                    {
+                        metrics.contractAmount = ((BigDecimal) amount).doubleValue();
+                    }
+                    else if (amount instanceof Number)
+                    {
+                        metrics.contractAmount = ((Number) amount).doubleValue();
+                    }
+                    metrics.winRate = json.getDoubleValue("winRate");
+                    metrics.activityScore = json.getDoubleValue("activityScore");
+                    metrics.paymentRate = json.getDoubleValue("paymentRate");
+                    return metrics;
+                }
+            }
+            catch (Exception ignored)
+            {
+            }
+            List<Integer> legacy = JSON.parseArray(profile.getMonthlyPerformance(), Integer.class);
+            if (legacy != null && legacy.size() >= 6)
+            {
+                metrics.customerCount = legacy.get(0);
+                metrics.opportunityCount = legacy.get(1);
+                metrics.winRate = legacy.get(3);
+                metrics.activityScore = legacy.get(4);
+                metrics.paymentRate = legacy.get(5);
+            }
+        }
+
+        if (StringUtils.isNotEmpty(createBy))
+        {
+            int operCount = crmUserProfileMapper.countRecentOperLogByOperator(createBy);
+            metrics.activityScore = Math.min(100, operCount * 5);
+            int contractTotal = crmUserProfileMapper.countContractByCreateBy(createBy);
+            int activeContract = crmUserProfileMapper.countActiveContractByCreateBy(createBy);
+            metrics.paymentRate = contractTotal > 0 ? (double) activeContract / contractTotal * 100 : 0;
+        }
+        return metrics;
+    }
+
+    private static double normalizeToScore(double value, double targetFullScore)
+    {
+        if (targetFullScore <= 0)
+        {
+            return 0;
+        }
+        return Math.min(100, Math.max(0, value / targetFullScore * 100));
+    }
+
+    private static Object formatRawValue(int index, double value)
+    {
+        if (index == 2)
+        {
+            return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP);
+        }
+        if (index >= 3)
+        {
+            return round1(value);
+        }
+        return (long) Math.round(value);
+    }
+
+    private static double safeLong(Long v)
+    {
+        return v != null ? v.doubleValue() : 0;
+    }
+
+    private static double round1(double v)
+    {
+        return Math.round(v * 10) / 10.0;
     }
 
     private List<Map<String, Object>> parseJsonArray(String json)
@@ -191,5 +311,15 @@ public class CrmUserProfileServiceImpl implements ICrmUserProfileService
             result.add(item);
         }
         return result;
+    }
+
+    private static class RadarMetrics
+    {
+        double customerCount;
+        double opportunityCount;
+        double contractAmount;
+        double winRate;
+        double activityScore;
+        double paymentRate;
     }
 }

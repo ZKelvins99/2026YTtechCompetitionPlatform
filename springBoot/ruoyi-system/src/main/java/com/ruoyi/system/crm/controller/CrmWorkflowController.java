@@ -9,11 +9,13 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.Collections;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.enums.BusinessType;
 import com.ruoyi.system.crm.domain.CrmWorkflowActionRequest;
+import com.ruoyi.system.crm.domain.CrmWorkflowStartRequest;
 import com.ruoyi.system.crm.service.ICrmWorkflowService;
 
 @RestController
@@ -26,24 +28,23 @@ public class CrmWorkflowController extends BaseController
     @PreAuthorize("@ss.hasPermi('crm:workflow:start')")
     @Log(title = "合同审批", businessType = BusinessType.INSERT)
     @PostMapping("/start")
-    public AjaxResult start(@RequestBody java.util.Map<String, Long> body)
+    public AjaxResult start(@RequestBody CrmWorkflowStartRequest request)
     {
-        Long contractId = body.get("contractId");
-        return success(workflowService.startContractApproval(contractId, getUserId()));
+        return success(workflowService.startContractApproval(request, getUserId()));
     }
 
     @PreAuthorize("@ss.hasPermi('crm:workflow:query')")
     @GetMapping("/instance/{id}")
     public AjaxResult getInstance(@PathVariable Long id)
     {
-        return success(workflowService.getInstanceDetail(id));
+        return success(workflowService.getInstanceDetail(id, getUserId()));
     }
 
     @PreAuthorize("@ss.hasPermi('crm:workflow:query')")
     @GetMapping("/instance/{id}/bpmn")
     public AjaxResult getBpmn(@PathVariable Long id)
     {
-        return success(workflowService.getBpmnXml(id));
+        return success(Collections.singletonMap("bpmnXml", workflowService.getBpmnXml(id)));
     }
 
     @PreAuthorize("@ss.hasPermi('crm:workflow:approve')")

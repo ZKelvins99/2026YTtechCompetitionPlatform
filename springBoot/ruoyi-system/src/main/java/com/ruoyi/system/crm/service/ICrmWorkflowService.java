@@ -2,12 +2,13 @@ package com.ruoyi.system.crm.service;
 
 import com.ruoyi.system.crm.domain.CrmWorkflowActionRequest;
 import com.ruoyi.system.crm.domain.CrmWorkflowInstance;
+import com.ruoyi.system.crm.domain.CrmWorkflowStartRequest;
 
 public interface ICrmWorkflowService
 {
-    CrmWorkflowInstance startContractApproval(Long contractId, Long userId);
+    CrmWorkflowInstance startContractApproval(CrmWorkflowStartRequest request, Long userId);
 
-    CrmWorkflowInstance getInstanceDetail(Long instanceId);
+    CrmWorkflowInstance getInstanceDetail(Long instanceId, Long userId);
 
     String getBpmnXml(Long instanceId);
 

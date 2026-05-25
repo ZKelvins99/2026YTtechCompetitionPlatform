@@ -1,9 +1,6 @@
 <template>
   <div class="app-container crm-page">
-    <crm-page-header
-      title="API 服务市场"
-      description="API 全生命周期管理：发布、在线调试、上下架、编辑与删除。"
-    />
+    <crm-page-header title="API 服务市场" v-bind="CRM_PAGE_INTRO.api" />
     <el-tabs v-model="activeTab" class="crm-panel-tabs">
       <el-tab-pane label="API 市场" name="market">
         <el-row :gutter="16">
@@ -102,7 +99,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="接口地址" prop="apiUrl">
-          <el-input v-model="form.apiUrl" placeholder="如 /crm/api/demo/customer-count" />
+          <el-input v-model="form.apiUrl" placeholder="须以 / 开头，如 /crm/customer/list" />
         </el-form-item>
         <el-form-item label="请求示例" prop="requestExample">
           <el-input v-model="form.requestExample" type="textarea" :rows="3" placeholder="JSON 请求体示例（POST 时使用）" />
@@ -153,6 +150,7 @@
 
 <script setup name="CrmApiMarket">
 import { listApi, getApi, addApi, updateApi, delApi, onlineApi, offlineApi, debugApi as debugApiRequest } from '@/api/crm/apiMarket'
+import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 
@@ -238,9 +236,22 @@ function handleUpdate(row) {
   })
 }
 
+function normalizeApiUrl(url) {
+  if (!url) return url
+  let u = String(url).trim().replace(/\\/g, '/')
+  while (u.includes('//')) u = u.replace('//', '/')
+  if (!u.startsWith('/')) u = '/' + u
+  if (u.length > 1 && u.endsWith('/')) u = u.slice(0, -1)
+  return u
+}
+
 function submitForm() {
   proxy.$refs.formRef.validate(valid => {
     if (!valid) return
+    form.value.apiUrl = normalizeApiUrl(form.value.apiUrl)
+    if (form.value.apiMethod) {
+      form.value.apiMethod = form.value.apiMethod.toUpperCase()
+    }
     const req = form.value.id ? updateApi(form.value) : addApi(form.value)
     req.then(() => {
       proxy.$modal.msgSuccess(form.value.id ? '修改成功' : '发布成功')

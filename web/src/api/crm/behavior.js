@@ -31,6 +31,14 @@ export function getBehaviorTask(taskId) {
   })
 }
 
+/** 当前用户进行中的 Excel 导入任务（Redis），无任务时 data 为 null */
+export function getActiveBehaviorImport() {
+  return request({
+    url: '/crm/behavior/importActive',
+    method: 'get'
+  })
+}
+
 export function clearBehaviorData() {
   return request({
     url: '/crm/behavior/clear',
@@ -38,10 +46,11 @@ export function clearBehaviorData() {
   })
 }
 
-export function getBehaviorTotal() {
+export function getBehaviorTotal(refresh = false) {
   return request({
     url: '/crm/behavior/total',
-    method: 'get'
+    method: 'get',
+    params: refresh ? { refresh: true } : {}
   })
 }
 
@@ -50,7 +59,7 @@ export function scrollBehavior(params) {
   return axios.get(baseURL + '/crm/behavior/scroll', {
     params,
     headers: { Authorization: 'Bearer ' + getToken() },
-    timeout: 30000
+    timeout: 120000
   }).then(res => {
     const code = res.data?.code || 200
     if (code !== 200) {

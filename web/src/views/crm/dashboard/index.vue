@@ -1,50 +1,148 @@
 <template>
-  <div class="crm-dashboard">
-    <div class="dashboard-header">
-      <h2>CRM 数据监控大屏</h2>
-      <span class="refresh-tip">每 10 秒自动刷新</span>
+  <div class="crm-dashboard relative min-h-[calc(100vh-84px)] overflow-hidden bg-gradient-to-b from-slate-50 via-white to-slate-100/80 px-4 py-5 text-slate-700">
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute -right-20 top-0 h-72 w-72 rounded-full bg-sky-100/80 blur-3xl" />
+      <div class="absolute bottom-0 left-10 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl" />
     </div>
 
-    <div class="dashboard-grid">
-      <div class="panel gauge-panel" ref="cpuGaugeRef"></div>
-      <div class="panel gauge-panel" ref="memGaugeRef"></div>
-      <div class="panel stat-panel">
-        <div class="stat-title">今日操作总次数</div>
-        <div class="stat-value">{{ logStats.todayTotal || 0 }}</div>
-        <div class="stat-trend" :class="trendClass">
-          <el-icon><component :is="trendIcon" /></el-icon>
-          较昨日 {{ Math.abs(logStats.todayTrend || 0) }}%
+    <div class="relative z-10">
+      <header class="mb-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p class="mb-1 text-xs font-medium tracking-wide text-brand-600">Operations Monitor</p>
+          <h2 class="m-0 text-2xl font-bold tracking-tight text-slate-800 sm:text-3xl">CRM 数据监控大屏</h2>
         </div>
-      </div>
-      <div class="panel stat-panel">
-        <div class="stat-title">异常次数 / 异常率</div>
-        <div class="stat-value">{{ logStats.errorCount || 0 }} <small>/ {{ logStats.errorRate || 0 }}%</small></div>
-        <div class="mini-chart" ref="errorChartRef"></div>
-      </div>
-      <div class="panel chart-panel" ref="barChartRef"></div>
-      <div class="panel chart-panel" ref="pieChartRef"></div>
-    </div>
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-medium text-emerald-700">
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-50" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            每 10 秒自动刷新
+          </span>
+          <span class="hidden text-xs text-slate-400 sm:inline">{{ lastRefreshText }}</span>
+        </div>
+      </header>
 
-    <div class="panel log-panel" @mouseenter="paused = true" @mouseleave="paused = false">
-      <div class="panel-title">最近操作日志（实时滚动）</div>
-      <div class="log-scroll-wrap" ref="logScrollRef">
-        <el-table :data="logStats.recentLogs" size="small" :show-header="true" class="dark-table">
-          <el-table-column label="操作人" prop="operator" width="100" />
-          <el-table-column label="请求地址" prop="requestUrl" show-overflow-tooltip />
-          <el-table-column label="方式" prop="requestMethod" width="70" align="center" />
-          <el-table-column label="耗时(ms)" prop="costMillis" width="90" align="center" />
-          <el-table-column label="状态" width="70" align="center">
-            <template #default="scope">
-              <el-tag :type="scope.row.status === '0' ? 'success' : 'danger'" size="small">
-                {{ scope.row.status === '0' ? '成功' : '失败' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="时间" prop="operateTime" width="160">
-            <template #default="scope">{{ parseTime(scope.row.operateTime) }}</template>
-          </el-table-column>
-        </el-table>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section class="dash-card min-h-[240px]">
+          <div class="dash-card__inner flex min-h-[232px] flex-col p-3">
+            <h3 class="dash-card__title">CPU 使用率</h3>
+            <div class="min-h-0 flex-1" ref="cpuGaugeRef" />
+          </div>
+        </section>
+        <section class="dash-card min-h-[240px]">
+          <div class="dash-card__inner flex min-h-[232px] flex-col p-3">
+            <h3 class="dash-card__title">内存使用率</h3>
+            <div class="min-h-0 flex-1" ref="memGaugeRef" />
+          </div>
+        </section>
+        <section class="dash-card sm:col-span-2 xl:col-span-1">
+          <div class="dash-card__inner flex min-h-[232px] flex-col items-center justify-center p-6 text-center">
+            <p class="text-sm text-slate-500">今日操作总次数</p>
+            <p class="mt-2 font-mono text-5xl font-bold tabular-nums text-slate-800">{{ logStats.todayTotal ?? 0 }}</p>
+            <p
+              class="mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium"
+              :class="trendClass === 'up' ? 'bg-emerald-50 text-emerald-700' : trendClass === 'down' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'"
+            >
+              <el-icon><component :is="trendIcon" /></el-icon>
+              较昨日 {{ Math.abs(logStats.todayTrend || 0) }}%
+            </p>
+          </div>
+        </section>
+        <section class="dash-card sm:col-span-2 xl:col-span-1">
+          <div class="dash-card__inner flex min-h-[232px] flex-col items-center justify-center p-6">
+            <p class="text-sm text-slate-500">异常次数 / 异常率</p>
+            <p class="mt-2 font-mono text-4xl font-bold text-slate-800">
+              {{ logStats.errorCount ?? 0 }}
+              <span class="text-xl font-semibold text-rose-500">/ {{ logStats.errorRate ?? 0 }}%</span>
+            </p>
+            <div class="mt-3 h-14 w-full max-w-xs" ref="errorChartRef" />
+          </div>
+        </section>
+        <section class="dash-card min-h-[240px]">
+          <div class="dash-card__inner min-h-[232px] p-2" ref="barChartRef" />
+        </section>
+        <section class="dash-card min-h-[240px]">
+          <div class="dash-card__inner min-h-[232px] p-2" ref="pieChartRef" />
+        </section>
       </div>
+
+      <section class="log-panel mt-4">
+        <div class="log-panel__header">
+          <div class="flex items-center gap-2">
+            <span class="log-panel__dot" />
+            <h3 class="m-0 text-base font-semibold text-slate-800">最近操作日志</h3>
+            <span class="rounded-md bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">实时滚动</span>
+          </div>
+          <span class="text-xs text-slate-400">悬停暂停 · {{ logCount }} 条</span>
+        </div>
+
+        <div class="log-table">
+          <div class="log-table__head grid-cols-log">
+            <span>操作人</span>
+            <span>请求地址</span>
+            <span class="text-center">方式</span>
+            <span class="text-center">耗时</span>
+            <span class="text-center">状态</span>
+            <span>时间</span>
+          </div>
+
+          <div
+            class="log-table__viewport"
+            @mouseenter="scrollPaused = true"
+            @mouseleave="scrollPaused = false"
+          >
+            <div v-if="!logList.length" class="log-table__empty">暂无操作日志</div>
+            <div
+              v-else
+              class="log-table__track"
+              :class="{ 'is-paused': scrollPaused }"
+              :style="{ '--scroll-duration': `${scrollDuration}s` }"
+            >
+              <div class="log-table__chunk">
+                <div
+                  v-for="(row, idx) in logList"
+                  :key="'a-' + idx"
+                  class="log-table__row grid-cols-log"
+                >
+                  <span class="truncate font-medium text-slate-700">{{ row.operator || '-' }}</span>
+                  <span class="truncate text-slate-500" :title="row.requestUrl">{{ row.requestUrl || '-' }}</span>
+                  <span class="text-center">
+                    <span class="log-method">{{ row.requestMethod || '-' }}</span>
+                  </span>
+                  <span class="text-center font-mono text-xs text-slate-500">{{ row.costMillis ?? '-' }}</span>
+                  <span class="flex justify-center">
+                    <span class="log-status" :class="row.status === '0' ? 'is-ok' : 'is-fail'">
+                      {{ row.status === '0' ? '成功' : '失败' }}
+                    </span>
+                  </span>
+                  <span class="truncate font-mono text-xs text-slate-400">{{ formatLogTime(row.operateTime) }}</span>
+                </div>
+              </div>
+              <div class="log-table__chunk" aria-hidden="true">
+                <div
+                  v-for="(row, idx) in logList"
+                  :key="'b-' + idx"
+                  class="log-table__row grid-cols-log"
+                >
+                  <span class="truncate font-medium text-slate-700">{{ row.operator || '-' }}</span>
+                  <span class="truncate text-slate-500" :title="row.requestUrl">{{ row.requestUrl || '-' }}</span>
+                  <span class="text-center">
+                    <span class="log-method">{{ row.requestMethod || '-' }}</span>
+                  </span>
+                  <span class="text-center font-mono text-xs text-slate-500">{{ row.costMillis ?? '-' }}</span>
+                  <span class="flex justify-center">
+                    <span class="log-status" :class="row.status === '0' ? 'is-ok' : 'is-fail'">
+                      {{ row.status === '0' ? '成功' : '失败' }}
+                    </span>
+                  </span>
+                  <span class="truncate font-mono text-xs text-slate-400">{{ formatLogTime(row.operateTime) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -54,20 +152,33 @@ import * as echarts from 'echarts'
 import { useIntervalFn } from '@vueuse/core'
 import { ArrowDown, ArrowUp, Minus } from '@element-plus/icons-vue'
 import { getSystemStatus, getLogStats } from '@/api/crm/dashboard'
+import { parseTime } from '@/utils/ruoyi'
 
 const cpuGaugeRef = ref(null)
 const memGaugeRef = ref(null)
 const barChartRef = ref(null)
 const pieChartRef = ref(null)
 const errorChartRef = ref(null)
-const logScrollRef = ref(null)
 
 const systemStatus = ref({})
 const logStats = ref({ recentLogs: [], hourlyStats: [], topUsers: [], moduleStats: [] })
+const scrollPaused = ref(false)
+const lastRefreshAt = ref(Date.now())
 
 let cpuChart, memChart, barChart, pieChart, errorChart
-let rafId = null
-let paused = false
+
+const logList = computed(() => logStats.value.recentLogs || [])
+const logCount = computed(() => logList.value.length)
+const scrollDuration = computed(() => {
+  const n = logCount.value
+  if (n <= 1) return 12
+  return Math.max(18, n * 2.8)
+})
+
+const lastRefreshText = computed(() => {
+  const d = new Date(lastRefreshAt.value)
+  return `更新于 ${d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+})
 
 const trendClass = computed(() => {
   const t = logStats.value.todayTrend || 0
@@ -78,55 +189,114 @@ const trendIcon = computed(() => {
   return t > 0 ? ArrowUp : t < 0 ? ArrowDown : Minus
 })
 
-function buildGauge(el, title, value, color) {
-  const chart = echarts.init(el, 'dark')
+function formatLogTime(time) {
+  return time ? parseTime(time) : '-'
+}
+
+function buildGauge(el, value, color, trackColor) {
+  const chart = echarts.init(el)
   chart.setOption({
     series: [{
-      type: 'gauge', startAngle: 200, endAngle: -20, min: 0, max: 100,
-      progress: { show: true, width: 14 },
-      axisLine: { lineStyle: { width: 14 } },
-      axisTick: { show: false }, splitLine: { show: false },
-      axisLabel: { show: false }, pointer: { show: false },
-      title: { offsetCenter: [0, '70%'], fontSize: 14, color: '#aaa' },
-      detail: { valueAnimation: true, fontSize: 28, offsetCenter: [0, '0%'], formatter: '{value}%', color: '#fff' },
-      data: [{ value: value || 0, name: title, itemStyle: { color } }]
+      type: 'gauge',
+      startAngle: 200,
+      endAngle: -20,
+      min: 0,
+      max: 100,
+      progress: { show: true, width: 12, itemStyle: { color } },
+      axisLine: { lineStyle: { width: 12, color: [[1, trackColor]] } },
+      axisTick: { show: false },
+      splitLine: { show: false },
+      axisLabel: { show: false },
+      pointer: { show: false },
+      title: { show: false },
+      detail: {
+        valueAnimation: true,
+        fontSize: 32,
+        fontWeight: 700,
+        offsetCenter: [0, '0%'],
+        formatter: '{value}%',
+        color: '#1e293b'
+      },
+      data: [{ value: value || 0 }]
     }]
   })
   return chart
 }
 
 function refreshCharts() {
-  if (cpuChart) cpuChart.setOption({ series: [{ data: [{ value: systemStatus.value.cpuUsage || 0 }] }] })
-  if (memChart) memChart.setOption({ series: [{ data: [{ value: systemStatus.value.memUsage || 0 }] }] })
-
-  if (barChart && logStats.value.topUsers) {
-    barChart.setOption({
-      title: { text: '活跃用户 TOP5', left: 'center', textStyle: { color: '#ccc', fontSize: 14 } },
-      grid: { left: 60, right: 20, top: 40, bottom: 30 },
-      xAxis: { type: 'category', data: logStats.value.topUsers.map(u => u.name), axisLabel: { color: '#aaa' } },
-      yAxis: { type: 'value', axisLabel: { color: '#aaa' }, splitLine: { lineStyle: { color: '#333' } } },
-      series: [{ type: 'bar', data: logStats.value.topUsers.map(u => u.value), itemStyle: { color: '#409eff' } }]
-    })
+  if (cpuChart) {
+    cpuChart.setOption({ series: [{ data: [{ value: systemStatus.value.cpuUsage || 0 }] }] })
+  }
+  if (memChart) {
+    memChart.setOption({ series: [{ data: [{ value: systemStatus.value.memUsage || 0 }] }] })
   }
 
-  if (pieChart && logStats.value.moduleStats) {
-    pieChart.setOption({
-      title: { text: '模块调用分布', left: 'center', textStyle: { color: '#ccc', fontSize: 14 } },
-      tooltip: { trigger: 'item' },
+  if (barChart && logStats.value.topUsers?.length) {
+    barChart.setOption({
+      backgroundColor: 'transparent',
+      title: { text: '活跃用户 TOP5', left: 12, top: 8, textStyle: { color: '#475569', fontSize: 13, fontWeight: 600 } },
+      grid: { left: 52, right: 16, top: 44, bottom: 28 },
+      xAxis: {
+        type: 'category',
+        data: logStats.value.topUsers.map(u => u.name),
+        axisLabel: { color: '#64748b', fontSize: 11 },
+        axisLine: { lineStyle: { color: '#e2e8f0' } }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: { color: '#64748b', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#f1f5f9' } }
+      },
       series: [{
-        type: 'pie', radius: ['35%', '65%'], center: ['50%', '55%'],
-        data: logStats.value.moduleStats.map(m => ({ name: m.name, value: m.value })),
-        label: { color: '#ccc' }
+        type: 'bar',
+        barWidth: '50%',
+        data: logStats.value.topUsers.map(u => u.value),
+        itemStyle: {
+          borderRadius: [6, 6, 0, 0],
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#60a5fa' },
+            { offset: 1, color: '#2563eb' }
+          ])
+        }
       }]
     })
   }
 
-  if (errorChart && logStats.value.hourlyStats) {
+  if (pieChart && logStats.value.moduleStats?.length) {
+    pieChart.setOption({
+      backgroundColor: 'transparent',
+      title: { text: '模块调用分布', left: 12, top: 8, textStyle: { color: '#475569', fontSize: 13, fontWeight: 600 } },
+      tooltip: { trigger: 'item' },
+      color: ['#3b82f6', '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#94a3b8'],
+      series: [{
+        type: 'pie',
+        radius: ['42%', '68%'],
+        center: ['50%', '58%'],
+        data: logStats.value.moduleStats.map(m => ({ name: m.name, value: m.value })),
+        label: { color: '#64748b', fontSize: 11 },
+        itemStyle: { borderColor: '#fff', borderWidth: 2 }
+      }]
+    })
+  }
+
+  if (errorChart && logStats.value.hourlyStats?.length) {
     errorChart.setOption({
-      grid: { left: 0, right: 0, top: 5, bottom: 0 },
+      grid: { left: 4, right: 4, top: 4, bottom: 4 },
       xAxis: { type: 'category', show: false, data: logStats.value.hourlyStats.map(h => h.hour) },
       yAxis: { type: 'value', show: false },
-      series: [{ type: 'line', smooth: true, symbol: 'none', data: logStats.value.hourlyStats.map(h => h.count), lineStyle: { color: '#f56c6c' }, areaStyle: { color: 'rgba(245,108,108,0.2)' } }]
+      series: [{
+        type: 'line',
+        smooth: true,
+        symbol: 'none',
+        data: logStats.value.hourlyStats.map(h => h.count),
+        lineStyle: { color: '#f43f5e', width: 2 },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(244, 63, 94, 0.25)' },
+            { offset: 1, color: 'rgba(244, 63, 94, 0)' }
+          ])
+        }
+      }]
     })
   }
 }
@@ -135,39 +305,24 @@ async function loadData() {
   const [sysRes, logRes] = await Promise.all([getSystemStatus(), getLogStats()])
   systemStatus.value = sysRes.data
   logStats.value = logRes.data
+  lastRefreshAt.value = Date.now()
   refreshCharts()
 }
 
 function initCharts() {
-  cpuChart = buildGauge(cpuGaugeRef.value, 'CPU 使用率', 0, '#67c23a')
-  memChart = buildGauge(memGaugeRef.value, '内存使用率', 0, '#409eff')
-  barChart = echarts.init(barChartRef.value, 'dark')
-  pieChart = echarts.init(pieChartRef.value, 'dark')
-  errorChart = echarts.init(errorChartRef.value, 'dark')
+  cpuChart = buildGauge(cpuGaugeRef.value, 0, '#10b981', '#e2e8f0')
+  memChart = buildGauge(memGaugeRef.value, 0, '#3b82f6', '#e2e8f0')
+  barChart = echarts.init(barChartRef.value)
+  pieChart = echarts.init(pieChartRef.value)
+  errorChart = echarts.init(errorChartRef.value)
 }
 
-
-function startLogScroll() {
-  const wrap = logScrollRef.value
-  if (!wrap) return
-
-  function step() {
-    if (!paused) {
-      wrap.scrollTop += 0.8
-      if (wrap.scrollTop >= wrap.scrollHeight - wrap.clientHeight) {
-        wrap.scrollTop = 0
-      }
-    }
-    rafId = requestAnimationFrame(step)
-  }
-  rafId = requestAnimationFrame(step)
-}
-
-function stopLogScroll() {
-  if (rafId) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
+function handleResize() {
+  cpuChart?.resize()
+  memChart?.resize()
+  barChart?.resize()
+  pieChart?.resize()
+  errorChart?.resize()
 }
 
 useIntervalFn(loadData, 10000)
@@ -175,47 +330,169 @@ useIntervalFn(loadData, 10000)
 onMounted(() => {
   initCharts()
   loadData()
-  startLogScroll()
-  window.addEventListener('resize', () => {
-    cpuChart?.resize(); memChart?.resize(); barChart?.resize(); pieChart?.resize(); errorChart?.resize()
-  })
+  window.addEventListener('resize', handleResize)
 })
 
 onBeforeUnmount(() => {
-  stopLogScroll()
-  cpuChart?.dispose(); memChart?.dispose(); barChart?.dispose(); pieChart?.dispose(); errorChart?.dispose()
+  window.removeEventListener('resize', handleResize)
+  cpuChart?.dispose()
+  memChart?.dispose()
+  barChart?.dispose()
+  pieChart?.dispose()
+  errorChart?.dispose()
 })
 </script>
 
 <style scoped>
 .crm-dashboard {
-  min-height: calc(100vh - 84px);
-  background: linear-gradient(180deg, #0d1b2a 0%, #1b263b 100%);
-  padding: 16px;
-  color: #e0e0e0;
+  --log-row-h: 44px;
+  --log-viewport-h: calc(var(--log-row-h) * 5);
 }
-.dashboard-header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
-.dashboard-header h2 { margin: 0; font-size: 22px; color: #fff; }
-.refresh-tip { font-size: 12px; color: #888; }
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: 220px 220px;
+
+.dash-card {
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.dash-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08);
+}
+.dash-card__inner {
+  height: 100%;
+  border-radius: inherit;
+}
+.dash-card__title {
+  margin: 0 0 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.log-panel {
+  border-radius: 1rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+.log-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
 }
-.panel { background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
-.gauge-panel, .chart-panel { min-height: 220px; }
-.stat-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
-.stat-title { font-size: 14px; color: #aaa; margin-bottom: 8px; }
-.stat-value { font-size: 36px; font-weight: bold; color: #fff; }
-.stat-value small { font-size: 18px; color: #f56c6c; }
-.stat-trend { margin-top: 8px; font-size: 13px; display: flex; align-items: center; gap: 4px; }
-.stat-trend.up { color: #67c23a; }
-.stat-trend.down { color: #f56c6c; }
-.stat-trend.flat { color: #909399; }
-.mini-chart { width: 100%; height: 60px; margin-top: 8px; }
-.log-panel { margin-top: 12px; padding: 12px; }
-.panel-title { font-size: 14px; margin-bottom: 8px; color: #ccc; }
-.log-scroll-wrap { height: 200px; overflow: hidden; }
-:deep(.dark-table) { background: transparent; --el-table-bg-color: transparent; --el-table-tr-bg-color: transparent; --el-table-header-bg-color: rgba(255,255,255,0.05); --el-table-text-color: #ccc; --el-table-header-text-color: #aaa; --el-table-border-color: rgba(255,255,255,0.08); }
+.log-panel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.log-table__head,
+.log-table__row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+}
+.grid-cols-log {
+  grid-template-columns: 88px minmax(0, 1fr) 56px 72px 64px 148px;
+}
+
+.log-table__head {
+  height: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.log-table__viewport {
+  height: var(--log-viewport-h);
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 5%, #000 95%, transparent 100%);
+}
+
+.log-table__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.log-table__track {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+  animation: log-scroll linear infinite;
+  animation-duration: var(--scroll-duration, 24s);
+}
+.log-table__track.is-paused {
+  animation-play-state: paused;
+}
+
+@keyframes log-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(0, -50%, 0); }
+}
+
+.log-table__row {
+  height: var(--log-row-h);
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s ease;
+}
+.log-table__row:hover {
+  background: #f0f9ff;
+}
+
+.log-method {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, monospace;
+  color: #0369a1;
+  background: #e0f2fe;
+}
+
+.log-status {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.log-status.is-ok {
+  color: #047857;
+  background: #d1fae5;
+}
+.log-status.is-fail {
+  color: #be123c;
+  background: #ffe4e6;
+}
+
+@media (max-width: 1024px) {
+  .grid-cols-log {
+    grid-template-columns: 72px minmax(0, 1fr) 48px 60px 56px 120px;
+  }
+}
 </style>
