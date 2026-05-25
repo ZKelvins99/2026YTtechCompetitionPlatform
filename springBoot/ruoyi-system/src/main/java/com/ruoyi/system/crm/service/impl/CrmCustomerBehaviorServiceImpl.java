@@ -28,7 +28,6 @@ import com.ruoyi.system.crm.domain.CrmCustomerBehavior;
 import com.ruoyi.system.crm.domain.CrmCustomerBehaviorImportTemplate;
 import com.ruoyi.system.crm.mapper.CrmCustomerBehaviorMapper;
 import com.ruoyi.system.crm.service.ICrmCustomerBehaviorService;
-import com.ruoyi.system.crm.support.CrmBehaviorBulkInserter;
 import com.ruoyi.system.crm.support.CrmBehaviorStatsCache;
 import com.ruoyi.system.crm.support.CrmBehaviorTaskManager;
 import jakarta.servlet.http.HttpServletResponse;
@@ -49,9 +48,6 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
 
     @Autowired
     private CrmBehaviorStatsCache statsCache;
-
-    @Autowired
-    private CrmBehaviorBulkInserter bulkInserter;
 
     @Override
     public String startGenerate(int count)
@@ -146,7 +142,6 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
         {
             statsCache.invalidate();
         }
-        bulkInserter.clearIdPool();
         return rows;
     }
 

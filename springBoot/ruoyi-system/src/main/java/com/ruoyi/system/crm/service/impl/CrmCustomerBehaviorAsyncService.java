@@ -35,6 +35,7 @@ import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.system.crm.domain.CrmCustomerBehavior;
 import com.ruoyi.system.crm.support.CrmBehaviorBulkInserter;
+import com.ruoyi.system.crm.support.CrmBehaviorImportSettings;
 import com.ruoyi.system.crm.support.CrmBehaviorStatsCache;
 import com.ruoyi.system.crm.support.CrmBehaviorTaskManager;
 
@@ -43,16 +44,24 @@ public class CrmCustomerBehaviorAsyncService
 {
     private static final Logger log = LoggerFactory.getLogger(CrmCustomerBehaviorAsyncService.class);
 
-    /** 并行落库消费者（每线程独占 JDBC 连接） */
-    private static final int CONSUMER_THREADS = 4;
-    private static final int QUEUE_CAPACITY = 32;
-    private static final int PROGRESS_STEP = 5000;
-    /** 结束哨兵（单例空列表，与业务 batch 引用区分） */
+    private static final int CONSUMER_THREADS = CrmBehaviorImportSettings.CONSUMER_THREADS;
+    private static final int QUEUE_CAPACITY = CrmBehaviorImportSettings.QUEUE_BATCH_CAPACITY;
+    private static final int PROGRESS_STEP = CrmBehaviorImportSettings.PROGRESS_STEP;
+    private static final int BATCH_SIZE = CrmBehaviorImportSettings.BATCH_SIZE;
     private static final List<CrmCustomerBehavior> END_SIGNAL = Collections.emptyList();
 
     private static final String[] DATE_PATTERNS = {
         "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy/MM/dd HH:mm:ss", "yyyy/MM/dd"
     };
+
+    private static final ThreadLocal<SimpleDateFormat[]> DATE_FORMATTERS = ThreadLocal.withInitial(() -> {
+        SimpleDateFormat[] formatters = new SimpleDateFormat[DATE_PATTERNS.length];
+        for (int i = 0; i < DATE_PATTERNS.length; i++)
+        {
+            formatters[i] = new SimpleDateFormat(DATE_PATTERNS[i]);
+        }
+        return formatters;
+    });
 
     @Autowired
     private CrmBehaviorBulkInserter bulkInserter;
@@ -77,22 +86,10 @@ public class CrmCustomerBehaviorAsyncService
     public void importExcelAsync(String taskId, String filePath)
     {
         File file = new File(filePath);
-        try (Workbook workbook = WorkbookFactory.create(file))
+        try
         {
-            Sheet sheet = workbook.getSheetAt(0);
-            if (sheet == null)
-            {
-                throw new ServiceException("Excel 无有效工作表");
-            }
-            DataFormatter formatter = new DataFormatter();
-            int total = countDataRows(sheet, formatter);
-            if (total <= 0)
-            {
-                throw new ServiceException("Excel 中无有效数据行（已跳过表头）");
-            }
-            taskManager.updateTotal(taskId, total);
             runPipeline(taskId, true, (queue, failed, failMessage) ->
-                produceFromSheet(sheet, formatter, queue, failed, failMessage));
+                produceFromExcelFile(taskId, file, queue, failed, failMessage));
         }
         catch (Exception e)
         {
@@ -155,7 +152,6 @@ public class CrmCustomerBehaviorAsyncService
             taskManager.updateProgress(taskId, finalProcessed);
             taskManager.markDone(taskId);
             statsCache.addImported(finalProcessed);
-            bulkInserter.clearIdPool();
         }
         catch (Exception e)
         {
@@ -165,6 +161,10 @@ public class CrmCustomerBehaviorAsyncService
             {
                 queue.offer(END_SIGNAL);
             }
+        }
+        finally
+        {
+            bulkInserter.clearIdPool();
         }
     }
 
@@ -184,16 +184,11 @@ public class CrmCustomerBehaviorAsyncService
                 {
                     break;
                 }
-                if (batch.isEmpty())
+                if (batch.isEmpty() || failed.get())
                 {
                     continue;
                 }
-                if (failed.get())
-                {
-                    break;
-                }
                 bulkInserter.insertBatch(session, batch);
-                session.commit();
                 int p = processed.addAndGet(batch.size());
                 if (p - lastReported >= PROGRESS_STEP)
                 {
@@ -201,6 +196,7 @@ public class CrmCustomerBehaviorAsyncService
                     taskManager.updateProgress(taskId, p);
                 }
             }
+            session.commitIfDirty();
         }
         catch (InterruptedException e)
         {
@@ -211,7 +207,7 @@ public class CrmCustomerBehaviorAsyncService
         catch (SQLException e)
         {
             failed.set(true);
-            failMessage.compareAndSet(null, e.getMessage());
+            failMessage.compareAndSet(null, toUserMessage(e));
             log.error("行为数据批量写入失败 taskId={}", taskId, e);
         }
         catch (Exception e)
@@ -234,45 +230,84 @@ public class CrmCustomerBehaviorAsyncService
         }
     }
 
-    private void produceFromSheet(Sheet sheet, DataFormatter formatter,
+    private void produceFromExcelFile(String taskId, File file,
         BlockingQueue<List<CrmCustomerBehavior>> queue,
         AtomicBoolean failed, AtomicReference<String> failMessage) throws Exception
     {
-        List<CrmCustomerBehavior> batch = new ArrayList<>(CrmBehaviorBulkInserter.BATCH_SIZE);
-        int lastRowNum = sheet.getLastRowNum();
-        for (int i = 1; i <= lastRowNum && !failed.get(); i++)
+        try (Workbook workbook = WorkbookFactory.create(file))
         {
-            Row row = sheet.getRow(i);
-            if (row == null || isEmptyRow(row, formatter))
+            Sheet sheet = workbook.getSheetAt(0);
+            if (sheet == null)
             {
-                continue;
+                throw new ServiceException("Excel 无有效工作表");
             }
-            batch.add(parseRow(row, formatter, i + 1));
-            if (batch.size() >= CrmBehaviorBulkInserter.BATCH_SIZE)
+            DataFormatter formatter = new DataFormatter();
+
+            List<List<CrmCustomerBehavior>> batches = new ArrayList<>();
+            List<CrmCustomerBehavior> batch = new ArrayList<>(BATCH_SIZE);
+            int total = 0;
+            int lastRowNum = sheet.getLastRowNum();
+            for (int i = 1; i <= lastRowNum; i++)
             {
-                queue.put(new ArrayList<>(batch));
-                batch.clear();
+                Row row = sheet.getRow(i);
+                if (row == null || isEmptyRow(row, formatter))
+                {
+                    continue;
+                }
+                try
+                {
+                    batch.add(parseRow(row, formatter, i + 1));
+                }
+                catch (ParseException e)
+                {
+                    throw new ServiceException(e.getMessage());
+                }
+                total++;
+                if (batch.size() >= BATCH_SIZE)
+                {
+                    batches.add(batch);
+                    batch = new ArrayList<>(BATCH_SIZE);
+                }
+            }
+            if (!batch.isEmpty())
+            {
+                batches.add(batch);
+            }
+            if (total <= 0)
+            {
+                throw new ServiceException("Excel 中无有效数据行（已跳过表头）");
+            }
+
+            taskManager.updateTotal(taskId, total);
+            bulkInserter.initIdPool(total);
+
+            for (List<CrmCustomerBehavior> part : batches)
+            {
+                if (failed.get())
+                {
+                    break;
+                }
+                bulkInserter.assignIds(part);
+                queue.put(part);
             }
         }
-        if (!batch.isEmpty() && !failed.get())
+        catch (SQLException e)
         {
-            queue.put(new ArrayList<>(batch));
-        }
-        if (failed.get())
-        {
-            throw new ServiceException(StringUtils.isNotEmpty(failMessage.get())
-                ? failMessage.get() : "导入失败");
+            failed.set(true);
+            failMessage.compareAndSet(null, toUserMessage(e));
+            throw new ServiceException(toUserMessage(e));
         }
     }
 
     private void produceGenerated(int count, BlockingQueue<List<CrmCustomerBehavior>> queue,
-        AtomicBoolean failed, AtomicReference<String> failMessage) throws InterruptedException
+        AtomicBoolean failed, AtomicReference<String> failMessage) throws Exception
     {
+        bulkInserter.initIdPool(count);
         Random random = new Random();
         int done = 0;
         while (done < count && !failed.get())
         {
-            int batchCount = Math.min(CrmBehaviorBulkInserter.BATCH_SIZE, count - done);
+            int batchCount = Math.min(BATCH_SIZE, count - done);
             List<CrmCustomerBehavior> batch = new ArrayList<>(batchCount);
             for (int i = 0; i < batchCount; i++)
             {
@@ -287,27 +322,10 @@ public class CrmCustomerBehaviorAsyncService
                 row.setBehaviorTime(cal.getTime());
                 batch.add(row);
             }
+            bulkInserter.assignIds(batch);
             queue.put(batch);
             done += batchCount;
         }
-        if (failed.get())
-        {
-            throw new ServiceException(failMessage.get());
-        }
-    }
-
-    private int countDataRows(Sheet sheet, DataFormatter formatter)
-    {
-        int total = 0;
-        for (int i = 1; i <= sheet.getLastRowNum(); i++)
-        {
-            Row row = sheet.getRow(i);
-            if (row != null && !isEmptyRow(row, formatter))
-            {
-                total++;
-            }
-        }
-        return total;
     }
 
     private boolean isEmptyRow(Row row, DataFormatter formatter)
@@ -368,17 +386,28 @@ public class CrmCustomerBehaviorAsyncService
 
     private Date parseDate(String value) throws ParseException
     {
-        for (String pattern : DATE_PATTERNS)
+        SimpleDateFormat[] formatters = DATE_FORMATTERS.get();
+        for (SimpleDateFormat formatter : formatters)
         {
             try
             {
-                return new SimpleDateFormat(pattern).parse(value);
+                return formatter.parse(value);
             }
             catch (ParseException ignored)
             {
             }
         }
         throw new ParseException("行为时间格式不正确：" + value, 0);
+    }
+
+    private static String toUserMessage(SQLException e)
+    {
+        String msg = e.getMessage();
+        if (msg != null && (msg.contains("套接字") || msg.contains("socket") || msg.contains("Socket")))
+        {
+            return "数据库连接超时或中断，请稍后重试";
+        }
+        return StringUtils.isNotEmpty(msg) ? msg : "数据库写入失败";
     }
 }
 

@@ -42,21 +42,6 @@ public class ThreadPoolConfig
         return executor;
     }
 
-    /** CRM 行为数据批量导入专用（与解析线程配合，多消费者落库） */
-    @Bean(name = "crmBehaviorImportExecutor")
-    public ThreadPoolTaskExecutor crmBehaviorImportExecutor()
-    {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(4);
-        executor.setMaxPoolSize(6);
-        executor.setQueueCapacity(128);
-        executor.setKeepAliveSeconds(120);
-        executor.setThreadNamePrefix("crm-behavior-import-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        executor.initialize();
-        return executor;
-    }
-
     /**
      * 执行周期性或定时任务
      */
