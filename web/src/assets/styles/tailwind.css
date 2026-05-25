@@ -77,4 +77,9 @@
   --el-fill-color-light: var(--color-base-200);
   --el-fill-color-blank: var(--color-base-100);
 
+  /* Menu */
+  --el-menu-bg-color: var(--color-base-100);
+  --el-menu-text-color: var(--color-base-content);
+  --el-menu-hover-bg-color: var(--color-base-200);
+  --el-menu-active-color: var(--color-primary);
 }
