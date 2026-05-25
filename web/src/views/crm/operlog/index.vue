@@ -85,7 +85,7 @@
       </div>
       <div class="detail-block">
         <div class="detail-label">SQL 语句列表（链路追踪）</div>
-        <pre class="json-pre">{{ formatSqlList(detail.sqlStatements) }}</pre>
+        <pre class="json-pre sql-pre">{{ formatSqlList(detail.sqlStatements) }}</pre>
       </div>
     </el-dialog>
   </div>
@@ -156,6 +156,7 @@ function formatSqlList(text) {
   try {
     const arr = JSON.parse(text)
     if (Array.isArray(arr)) {
+      if (arr.length === 0) return '（本请求未记录到 SQL，请确认已重启后端）'
       return arr.map((sql, i) => `${i + 1}. ${sql}`).join('\n\n')
     }
     return formatJson(text)
@@ -183,5 +184,9 @@ getList()
   white-space: pre-wrap;
   word-break: break-all;
   margin: 0;
+}
+.sql-pre {
+  max-height: 320px;
+  font-family: Consolas, 'Courier New', monospace;
 }
 </style>

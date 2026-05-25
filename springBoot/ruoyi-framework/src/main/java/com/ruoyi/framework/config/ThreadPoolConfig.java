@@ -47,9 +47,9 @@ public class ThreadPoolConfig
     public ThreadPoolTaskExecutor crmBehaviorImportExecutor()
     {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(64);
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(6);
+        executor.setQueueCapacity(128);
         executor.setKeepAliveSeconds(120);
         executor.setThreadNamePrefix("crm-behavior-import-");
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());

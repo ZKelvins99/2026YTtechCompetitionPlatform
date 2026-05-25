@@ -35,6 +35,18 @@
             <artifactId>oshi-core</artifactId>
         </dependency>
 
+        <!-- Excel 导入（行为数据流式/批量解析） -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+        </dependency>
+
+        <!-- JDBC 批量写入 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

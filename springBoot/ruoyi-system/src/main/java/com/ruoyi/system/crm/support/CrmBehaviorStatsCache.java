@@ -46,4 +46,25 @@ public class CrmBehaviorStatsCache
         cachedTotal = total;
         cachedAt = System.currentTimeMillis();
     }
+
+    /** 批量导入完成后按增量更新总量，避免百万级 COUNT(1) */
+    public void addImported(long delta)
+    {
+        if (delta <= 0)
+        {
+            return;
+        }
+        synchronized (this)
+        {
+            if (cachedTotal >= 0)
+            {
+                cachedTotal += delta;
+            }
+            else
+            {
+                cachedTotal = delta;
+            }
+            cachedAt = System.currentTimeMillis();
+        }
+    }
 }

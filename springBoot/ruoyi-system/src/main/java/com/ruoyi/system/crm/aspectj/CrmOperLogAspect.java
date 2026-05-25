@@ -75,12 +75,17 @@ public class CrmOperLogAspect
         finally
         {
             log.setCostMillis(System.currentTimeMillis() - start);
-            log.setSqlStatements(CrmTraceContext.getSqlStatementsJson());
+            String sqlJson = CrmTraceContext.getSqlStatementsJson();
+            log.setSqlStatements(sqlJson);
             try
             {
                 crmOperLogMapper.insertCrmOperLog(log);
             }
-            catch (Exception ignored) { }
+            catch (Exception e)
+            {
+                org.slf4j.LoggerFactory.getLogger(CrmOperLogAspect.class)
+                    .warn("CRM 操作日志入库失败 url={}", log.getRequestUrl(), e);
+            }
         }
     }
 

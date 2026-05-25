@@ -70,9 +70,9 @@ public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorServi
             throw new ServiceException("请选择 Excel 文件");
         }
         String original = file.getOriginalFilename();
-        if (original == null || (!original.endsWith(".xlsx") && !original.endsWith(".xls")))
+        if (original == null || !original.toLowerCase().endsWith(".xlsx"))
         {
-            throw new ServiceException("仅支持 xls、xlsx 格式");
+            throw new ServiceException("批量导入仅支持 xlsx 格式（请将 xls 另存为 xlsx）");
         }
         Long userId = SecurityUtils.getUserId();
         String taskId = UUID.randomUUID().toString().replace("-", "");

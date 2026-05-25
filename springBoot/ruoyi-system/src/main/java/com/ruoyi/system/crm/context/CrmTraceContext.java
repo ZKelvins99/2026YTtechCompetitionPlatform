@@ -3,6 +3,7 @@ package com.ruoyi.system.crm.context;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import com.alibaba.fastjson2.JSON;
 
 /**
  * CRM 请求链路追踪上下文（ThreadLocal）
@@ -15,6 +16,7 @@ public class CrmTraceContext
     public static void setTraceId(String traceId)
     {
         TRACE_ID.set(traceId);
+        SQL_LIST.remove();
     }
 
     public static String getTraceId()
@@ -38,18 +40,11 @@ public class CrmTraceContext
     public static String getSqlStatementsJson()
     {
         List<String> list = SQL_LIST.get();
-        if (list.isEmpty())
+        if (list == null || list.isEmpty())
         {
             return "[]";
         }
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < list.size(); i++)
-        {
-            if (i > 0) sb.append(",");
-            sb.append("\"").append(list.get(i).replace("\"", "\\\"")).append("\"");
-        }
-        sb.append("]");
-        return sb.toString();
+        return JSON.toJSONString(list);
     }
 
     public static void clear()

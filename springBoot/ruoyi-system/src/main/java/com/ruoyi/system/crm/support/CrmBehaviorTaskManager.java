@@ -107,6 +107,16 @@ public class CrmBehaviorTaskManager
                 return;
             }
             int p = status.getProcessed();
+            if (TASK_TYPE_IMPORT.equals(status.getTaskType()) && p <= 0)
+            {
+                status.setStatus("FAILED");
+                status.setMessage("未导入任何数据");
+                status.setProcessed(0);
+                refreshMetrics(status);
+                saveTask(status);
+                clearActiveImportIfMatch(status.getUserId(), taskId);
+                return;
+            }
             if (status.getTotal() <= 0 || p < status.getTotal())
             {
                 status.setTotal(p);

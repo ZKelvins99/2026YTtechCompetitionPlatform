@@ -80,7 +80,7 @@
         drag
         :auto-upload="false"
         :limit="1"
-        accept=".xlsx,.xls"
+        accept=".xlsx"
         :disabled="importRunning"
         :on-change="onFileChange"
         :on-remove="() => selectedFile = null"
@@ -88,7 +88,7 @@
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
         <template #tip>
-          <div class="el-upload__tip">支持 xls/xlsx；进度保存在 Redis，切换页面后回来仍可查看</div>
+          <div class="el-upload__tip">仅支持 xlsx；进度保存在 Redis，切换页面后回来仍可查看</div>
         </template>
       </el-upload>
       <div v-if="importRunning || (taskStatus && taskStatus.status !== 'RUNNING')" class="import-progress-panel">
@@ -250,7 +250,8 @@ const etaText = computed(() => {
 const progressStatus = computed(() => {
   if (!taskStatus.value) return undefined
   if (taskStatus.value.status === 'FAILED') return 'exception'
-  if (taskStatus.value.status === 'DONE') return 'success'
+  if (taskStatus.value.status === 'DONE' && (taskStatus.value.processed || 0) > 0) return 'success'
+  if (taskStatus.value.status === 'DONE') return 'exception'
   return undefined
 })
 
@@ -487,8 +488,13 @@ function beginPollTask(taskId) {
       taskStatus.value = r.data
       if (r.data.status === 'DONE') {
         stopPoll()
-        proxy.$modal.msgSuccess(`成功导入 ${r.data.processed} 条数据`)
-        reloadList()
+        const imported = Number(r.data.processed) || 0
+        if (imported <= 0) {
+          proxy.$modal.msgError('导入完成但未写入任何数据')
+        } else {
+          proxy.$modal.msgSuccess(`成功导入 ${imported.toLocaleString()} 条数据`)
+          reloadList()
+        }
       } else if (r.data.status === 'FAILED') {
         stopPoll()
       }

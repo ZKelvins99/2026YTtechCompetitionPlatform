@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import javax.sql.DataSource;
 import org.apache.ibatis.io.VFS;
+import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.boot.autoconfigure.SpringBootVFS;
@@ -34,6 +35,9 @@ public class MyBatisConfig
 {
     @Autowired
     private Environment env;
+
+    @Autowired(required = false)
+    private List<Interceptor> interceptors;
 
     static final String DEFAULT_RESOURCE_PATTERN = "**/*.class";
 
@@ -127,6 +131,10 @@ public class MyBatisConfig
         sessionFactory.setTypeAliasesPackage(typeAliasesPackage);
         sessionFactory.setMapperLocations(resolveMapperLocations(StringUtils.split(mapperLocations, ",")));
         sessionFactory.setConfigLocation(new DefaultResourceLoader().getResource(configLocation));
+        if (interceptors != null && !interceptors.isEmpty())
+        {
+            sessionFactory.setPlugins(interceptors.toArray(new Interceptor[0]));
+        }
         return sessionFactory.getObject();
     }
 }
