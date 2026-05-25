@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@plugin "daisyui/theme" {
+  name: "crm-light";
+  default: true;
+  --color-primary: #4f46e5;
+  --color-primary-content: #ffffff;
+  --color-secondary: #7c3aed;
+  --color-secondary-content: #ffffff;
+  --color-accent: #0891b2;
+  --color-accent-content: #ffffff;
+  --color-neutral: #1f2937;
+  --color-neutral-content: #f3f4f6;
+  --color-base-100: #ffffff;
+  --color-base-200: #f9fafb;
+  --color-base-300: #f3f4f6;
+  --color-base-content: #111827;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+  --rounded-box: 0.5rem;
+  --rounded-btn: 0.5rem;
+}
+
+/*
+ * DaisyUI → Element Plus CSS variable bridge
+ * Element Plus components read these variables at runtime
+ */
+:root {
+  /* Primary */
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: color-mix(in srgb, var(--color-primary) 70%, #fff);
+  --el-color-primary-light-5: color-mix(in srgb, var(--color-primary) 50%, #fff);
+  --el-color-primary-light-7: color-mix(in srgb, var(--color-primary) 30%, #fff);
+  --el-color-primary-light-8: color-mix(in srgb, var(--color-primary) 20%, #fff);
+  --el-color-primary-light-9: color-mix(in srgb, var(--color-primary) 10%, #fff);
+  --el-color-primary-dark-2: color-mix(in srgb, var(--color-primary) 80%, #000);
+
+  /* Semantic */
+  --el-color-success: var(--color-success);
+  --el-color-warning: var(--color-warning);
+  --el-color-danger: var(--color-error);
+  --el-color-error: var(--color-error);
+  --el-color-info: var(--color-info);
+
+  /* Background */
+  --el-bg-color: var(--color-base-100);
+  --el-bg-color-page: var(--color-base-200);
+  --el-bg-color-overlay: var(--color-base-100);
+
+  /* Text */
+  --el-text-color-primary: var(--color-base-content);
+  --el-text-color-regular: color-mix(in srgb, var(--color-base-content) 85%, transparent);
+  --el-text-color-secondary: color-mix(in srgb, var(--color-base-content) 60%, transparent);
+  --el-text-color-placeholder: color-mix(in srgb, var(--color-base-content) 40%, transparent);
+
+  /* Border */
+  --el-border-color: var(--color-base-300);
+  --el-border-color-light: var(--color-base-200);
+  --el-border-color-lighter: color-mix(in srgb, var(--color-base-300) 70%, transparent);
+  --el-border-color-extra-light: color-mix(in srgb, var(--color-base-300) 50%, transparent);
+
+  /* Border radius */
+  --el-border-radius-base: var(--rounded-box);
+  --el-border-radius-small: calc(var(--rounded-box) - 2px);
+  --el-border-radius-round: 9999px;
+
+  /* Shadow */
+  --el-box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --el-box-shadow-light: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --el-box-shadow-dark: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+
+  /* Fill */
+  --el-fill-color: var(--color-base-200);
+  --el-fill-color-light: var(--color-base-200);
+  --el-fill-color-blank: var(--color-base-100);
+
+  /* Menu */
+  --el-menu-bg-color: var(--color-base-100);
+  --el-menu-text-color: var(--color-base-content);
+  --el-menu-hover-bg-color: var(--color-base-200);
+  --el-menu-active-color: var(--color-primary);
+}
