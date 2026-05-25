@@ -146,8 +146,6 @@ function initCharts() {
   errorChart = echarts.init(errorChartRef.value, 'dark')
 }
 
-let rafId = null
-let paused = false
 
 function startLogScroll() {
   const wrap = logScrollRef.value
