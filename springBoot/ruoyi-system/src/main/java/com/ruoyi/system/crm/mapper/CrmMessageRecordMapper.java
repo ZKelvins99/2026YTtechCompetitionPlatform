@@ -17,4 +17,8 @@ public interface CrmMessageRecordMapper
     int countUnreadByReceiver(@Param("receiverId") Long receiverId);
 
     List<CrmMessageRecord> selectUnreadList(@Param("receiverId") Long receiverId, @Param("limit") int limit);
+
+    List<CrmMessageRecord> selectInboxList(@Param("userId") Long userId, @Param("limit") int limit);
+
+    int markAsRead(@Param("id") Long id, @Param("receiverId") Long receiverId);
 }

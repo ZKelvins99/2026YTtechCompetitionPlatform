@@ -37,6 +37,15 @@ public class CrmMessageRecordServiceImpl implements ICrmMessageRecordService
     @Override
     public int sendMessage(CrmMessageSendRequest request, Long senderId)
     {
+        if (senderId == null || request.getReceiverId() == null)
+        {
+            throw new ServiceException("发送人或接收人不能为空");
+        }
+        if (senderId.equals(request.getReceiverId()))
+        {
+            throw new ServiceException("发送人与接收人不能为同一人");
+        }
+
         CrmMessageTemplate template = crmMessageTemplateMapper.selectCrmMessageTemplateById(request.getTemplateId());
         if (template == null)
         {
@@ -60,11 +69,8 @@ public class CrmMessageRecordServiceImpl implements ICrmMessageRecordService
     @Override
     public int recallMessage(Long id, Long operatorId)
     {
-        CrmMessageRecord record = crmMessageRecordMapper.selectCrmMessageRecordById(id);
-        if (record == null)
-        {
-            throw new ServiceException("消息记录不存在");
-        }
+        CrmMessageRecord record = requireParticipantRecord(id, operatorId);
+
         if (!"0".equals(record.getStatus()))
         {
             throw new ServiceException("仅已发送状态的消息可撤回");
@@ -83,11 +89,8 @@ public class CrmMessageRecordServiceImpl implements ICrmMessageRecordService
     @Override
     public int resendMessage(Long id, Long operatorId)
     {
-        CrmMessageRecord record = crmMessageRecordMapper.selectCrmMessageRecordById(id);
-        if (record == null)
-        {
-            throw new ServiceException("消息记录不存在");
-        }
+        CrmMessageRecord record = requireParticipantRecord(id, operatorId);
+
         if (!"1".equals(record.getStatus()))
         {
             throw new ServiceException("仅已撤回状态的消息可重发");
@@ -105,6 +108,21 @@ public class CrmMessageRecordServiceImpl implements ICrmMessageRecordService
     }
 
     @Override
+    public int markAsRead(Long id, Long userId)
+    {
+        CrmMessageRecord record = requireParticipantRecord(id, userId);
+        if (!userId.equals(record.getReceiverId()))
+        {
+            throw new ServiceException("仅接收人可标记已读");
+        }
+        if (!"0".equals(record.getStatus()))
+        {
+            throw new ServiceException("仅未读消息可标记已读");
+        }
+        return crmMessageRecordMapper.markAsRead(id, userId);
+    }
+
+    @Override
     public int countUnread(Long receiverId)
     {
         return crmMessageRecordMapper.countUnreadByReceiver(receiverId);
@@ -114,6 +132,26 @@ public class CrmMessageRecordServiceImpl implements ICrmMessageRecordService
     public List<CrmMessageRecord> selectUnreadList(Long receiverId, int limit)
     {
         return crmMessageRecordMapper.selectUnreadList(receiverId, limit);
+    }
+
+    @Override
+    public List<CrmMessageRecord> selectInboxList(Long userId, int limit)
+    {
+        return crmMessageRecordMapper.selectInboxList(userId, limit);
+    }
+
+    private CrmMessageRecord requireParticipantRecord(Long id, Long userId)
+    {
+        CrmMessageRecord record = crmMessageRecordMapper.selectCrmMessageRecordById(id);
+        if (record == null)
+        {
+            throw new ServiceException("消息记录不存在");
+        }
+        if (userId == null || (!userId.equals(record.getSenderId()) && !userId.equals(record.getReceiverId())))
+        {
+            throw new ServiceException("无权操作该消息");
+        }
+        return record;
     }
 
     private String renderText(String text, Map<String, String> variables)

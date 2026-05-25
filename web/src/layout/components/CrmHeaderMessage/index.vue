@@ -15,7 +15,12 @@
       <div v-if="loading" class="crm-msg-empty">加载中...</div>
       <div v-else-if="!crmMessageStore.unreadList.length" class="crm-msg-empty">暂无未读消息</div>
       <div v-else>
-        <div v-for="item in crmMessageStore.unreadList" :key="item.id" class="crm-msg-item">
+        <div
+          v-for="item in crmMessageStore.unreadList"
+          :key="item.id"
+          class="crm-msg-item crm-msg-unread"
+          @click="handleRead(item)"
+        >
           <div class="crm-msg-title">{{ item.title }}</div>
           <div class="crm-msg-meta">{{ item.senderName }} · {{ parseTime(item.sendTime) }}</div>
         </div>
@@ -36,6 +41,15 @@ async function onShow() {
   loading.value = true
   await crmMessageStore.fetchUnread()
   loading.value = false
+}
+
+async function handleRead(item) {
+  loading.value = true
+  try {
+    await crmMessageStore.markRead(item.id)
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(() => {
@@ -69,6 +83,12 @@ useIntervalFn(() => crmMessageStore.fetchUnread(), 30000)
   border-bottom: 1px solid #f5f5f5;
 }
 .crm-msg-item:last-child { border-bottom: none; }
-.crm-msg-title { font-size: 13px; color: #333; margin-bottom: 4px; }
-.crm-msg-meta { font-size: 11px; color: #999; }
+.crm-msg-unread {
+  cursor: pointer;
+}
+.crm-msg-unread:hover {
+  background: #f5f7fa;
+}
+.crm-msg-title { font-size: 13px; color: #303133; font-weight: 700; margin-bottom: 4px; }
+.crm-msg-meta { font-size: 11px; color: #606266; }
 </style>

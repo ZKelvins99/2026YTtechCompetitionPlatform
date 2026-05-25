@@ -46,6 +46,9 @@
             <if test="receiverId != null">
                 AND r.receiver_id = #{receiverId}
             </if>
+            <if test="participantId != null">
+                AND (r.sender_id = #{participantId} OR r.receiver_id = #{participantId})
+            </if>
         </where>
         order by r.id desc
     </select>
@@ -85,4 +88,18 @@
             order by r.send_time desc
         ) where rownum &lt;= #{limit}
     </select>
+
+    <select id="selectInboxList" resultMap="CrmMessageRecordResult">
+        select * from (
+            <include refid="selectVo"/>
+            where (r.sender_id = #{userId} or r.receiver_id = #{userId})
+            order by r.send_time desc
+        ) where rownum &lt;= #{limit}
+    </select>
+
+    <update id="markAsRead">
+        update crm_message_record
+        set status = '2'
+        where id = #{id} and receiver_id = #{receiverId} and status = '0'
+    </update>
 </mapper>

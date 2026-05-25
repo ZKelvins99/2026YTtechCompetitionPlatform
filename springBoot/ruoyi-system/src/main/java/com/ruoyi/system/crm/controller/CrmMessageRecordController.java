@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -37,6 +38,7 @@ public class CrmMessageRecordController extends BaseController
     public TableDataInfo list(CrmMessageRecord record)
     {
         startPage();
+        record.setParticipantId(getUserId());
         List<CrmMessageRecord> list = crmMessageRecordService.selectCrmMessageRecordList(record);
         return getDataTable(list);
     }
@@ -83,5 +85,19 @@ public class CrmMessageRecordController extends BaseController
     public AjaxResult unreadList()
     {
         return success(crmMessageRecordService.selectUnreadList(getUserId(), 5));
+    }
+
+    @GetMapping("/inbox-list")
+    public AjaxResult inboxList(@RequestParam(defaultValue = "8") int limit)
+    {
+        int safeLimit = Math.min(Math.max(limit, 1), 20);
+        return success(crmMessageRecordService.selectInboxList(getUserId(), safeLimit));
+    }
+
+    @Log(title = "消息已读", businessType = BusinessType.UPDATE)
+    @PutMapping("/read/{id}")
+    public AjaxResult markRead(@PathVariable Long id)
+    {
+        return toAjax(crmMessageRecordService.markAsRead(id, getUserId()));
     }
 }

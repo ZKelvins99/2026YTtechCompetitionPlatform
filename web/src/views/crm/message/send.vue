@@ -43,10 +43,12 @@
 import { getSendTemplateList, sendMessage } from '@/api/crm/message'
 import { listUser } from '@/api/system/user'
 import useCrmMessageStore from '@/stores/crm/message'
+import useUserStore from '@/store/modules/user'
 import { CRM_PAGE_INTRO } from '@/constants/crmPageIntro'
 
 const { proxy } = getCurrentInstance()
 const crmMessageStore = useCrmMessageStore()
+const userStore = useUserStore()
 
 const templateOptions = ref([])
 const userList = ref([])
@@ -118,6 +120,10 @@ function resetForm() {
 function handleSend() {
   proxy.$refs.formRef.validate(valid => {
     if (!valid) return
+    if (form.value.receiverId === userStore.id) {
+      proxy.$modal.msgError('不能给自己发送消息')
+      return
+    }
     sending.value = true
     sendMessage({
       templateId: form.value.templateId,
@@ -125,7 +131,7 @@ function handleSend() {
       variables: form.value.variables
     }).then(() => {
       proxy.$modal.msgSuccess('发送成功')
-      crmMessageStore.fetchUnread()
+      crmMessageStore.refreshAll()
       resetForm()
     }).finally(() => { sending.value = false })
   })
@@ -133,6 +139,8 @@ function handleSend() {
 
 onMounted(() => {
   getSendTemplateList().then(res => { templateOptions.value = res.data || [] })
-  listUser({ pageNum: 1, pageSize: 200, status: '0' }).then(res => { userList.value = res.rows || [] })
+  listUser({ pageNum: 1, pageSize: 200, status: '0' }).then(res => {
+    userList.value = (res.rows || []).filter(u => u.userId !== userStore.id)
+  })
 })
 </script>

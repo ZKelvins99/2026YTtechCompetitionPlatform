@@ -27,6 +27,9 @@ public class CrmMessageRecord extends BaseEntity
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private Date recallTime;
 
+    /** 查询条件：当前用户须为发送人或接收人 */
+    private Long participantId;
+
     /** 展示字段 */
     private String senderName;
     private String receiverName;
@@ -56,4 +59,6 @@ public class CrmMessageRecord extends BaseEntity
     public void setReceiverName(String receiverName) { this.receiverName = receiverName; }
     public String getTemplateName() { return templateName; }
     public void setTemplateName(String templateName) { this.templateName = templateName; }
+    public Long getParticipantId() { return participantId; }
+    public void setParticipantId(Long participantId) { this.participantId = participantId; }
 }

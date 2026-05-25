@@ -19,4 +19,8 @@ public interface ICrmMessageRecordService
     int countUnread(Long receiverId);
 
     List<CrmMessageRecord> selectUnreadList(Long receiverId, int limit);
+
+    List<CrmMessageRecord> selectInboxList(Long userId, int limit);
+
+    int markAsRead(Long id, Long userId);
 }

@@ -4,6 +4,9 @@
       <template #header>
         <span>合同审批流程 — {{ instance.businessNo || '加载中' }}</span>
         <el-tag class="ml-2" :type="instanceStatusType">{{ instanceStatusText }}</el-tag>
+        <el-tag v-if="instance.currentStageName && instance.status === '0'" class="ml-2" type="warning">
+          当前：{{ instance.currentStageName }}
+        </el-tag>
       </template>
       <el-alert v-if="bpmnError" :title="bpmnError" type="warning" show-icon :closable="false" class="mb-2" />
       <div class="bpmn-viewport">
@@ -12,8 +15,25 @@
       <div class="bpmn-legend">
         <span class="legend-item legend-pass">已通过</span>
         <span class="legend-item legend-current">当前节点</span>
+        <span class="legend-item legend-countersign">含会签待办</span>
         <span class="legend-item legend-pending">待处理</span>
         <span class="legend-item legend-reject">驳回</span>
+      </div>
+    </el-card>
+
+    <el-card v-if="instance.status === '0'" shadow="never" class="stage-card">
+      <template #header>当前环节</template>
+      <p v-if="instance.pendingHint" class="pending-hint">
+        <span class="label">待办：</span>{{ instance.pendingHint }}
+      </p>
+      <p v-else class="pending-hint text-muted">暂无待办（流程可能已卡住，请联系管理员）</p>
+      <div v-if="currentStageNodes.length" class="stage-node-list">
+        <div v-for="n in currentStageNodes" :key="n.id" class="stage-node-item" :class="{ 'is-pending': n.status === '0' }">
+          <el-tag v-if="n.approvalType === 'COUNTERSIGN'" type="warning" size="small" effect="dark">会签</el-tag>
+          <el-tag v-else type="primary" size="small" effect="plain">主审</el-tag>
+          <span class="node-name">{{ n.approverName || '未指定' }}</span>
+          <el-tag size="small" :type="nodeStatusTag(n.status)">{{ nodeStatusLabel(n.status) }}</el-tag>
+        </div>
       </div>
     </el-card>
 
@@ -23,7 +43,7 @@
       show-icon
       :closable="false"
       class="mb-3"
-      title="当前节点待指定审批人处理；系统管理员可代为审批。"
+      :title="waitOperateHint"
     />
 
     <el-card v-if="instance.status === '0' && instance.canOperate" shadow="never" class="action-card">
@@ -32,11 +52,10 @@
           <el-input v-model="opinion" type="textarea" :rows="3" placeholder="请输入审批意见" />
         </el-form-item>
         <el-form-item>
-          <el-button type="success" @click="handleApprove" v-hasPermi="['crm:workflow:approve']">通过</el-button>
-          <el-button type="danger" @click="handleReject" v-hasPermi="['crm:workflow:approve']">驳回</el-button>
-          <el-button @click="openCountersign = true" v-hasPermi="['crm:workflow:approve']">会签</el-button>
-          <el-button @click="openTransfer = true" v-hasPermi="['crm:workflow:approve']">转办</el-button>
-          <el-dropdown @command="handleRollback" v-hasPermi="['crm:workflow:approve']">
+          <el-button type="success" @click="handleApprove">通过</el-button>
+          <el-button type="danger" @click="handleReject">驳回</el-button>
+          <el-button @click="openTransfer = true">转办</el-button>
+          <el-dropdown @command="handleRollback">
             <el-button class="ml-1">回退<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
             <template #dropdown>
               <el-dropdown-menu>
@@ -44,8 +63,9 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button type="danger" plain @click="handleTerminate" v-hasPermi="['crm:workflow:approve']">终止</el-button>
+          <el-button type="danger" plain @click="handleTerminate">终止</el-button>
         </el-form-item>
+        <p v-if="isAdminProxy" class="proxy-tip">您正以管理员身份处理当前环节待办</p>
       </el-form>
     </el-card>
 
@@ -59,20 +79,16 @@
           :timestamp="parseTime(node.approveTime) || '待处理'"
           placement="top"
         >
-          <p><strong>{{ node.nodeName }}</strong> — {{ approverLabel(node) }}</p>
+          <p>
+            <strong>{{ node.nodeName }}</strong>
+            <el-tag v-if="node.approvalType === 'COUNTERSIGN'" type="warning" size="small" class="ml-1">会签</el-tag>
+            <el-tag v-else-if="node.nodeOrder > 1" type="info" size="small" class="ml-1">主审</el-tag>
+            — {{ approverLabel(node) }}
+          </p>
           <p>{{ actionText(node.status) }} {{ node.opinion ? '：' + node.opinion : '' }}</p>
         </el-timeline-item>
       </el-timeline>
     </el-card>
-
-    <el-dialog title="会签" v-model="openCountersign" width="480px" append-to-body>
-      <el-select v-model="countersignUsers" multiple filterable placeholder="选择会签审批人" style="width:100%">
-        <el-option v-for="u in userList" :key="u.userId" :label="u.nickName" :value="u.userId" />
-      </el-select>
-      <template #footer>
-        <el-button type="primary" @click="submitCountersign">确 定</el-button>
-      </template>
-    </el-dialog>
 
     <el-dialog title="转办" v-model="openTransfer" width="480px" append-to-body>
       <el-select v-model="transferUserId" filterable placeholder="选择转办人" style="width:100%">
@@ -93,21 +109,21 @@ import 'bpmn-js/dist/assets/bpmn-font/css/bpmn.css'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listUser } from '@/api/system/user'
 import { resolveWorkflowBpmnXml } from '@/constants/contractApprovalBpmn'
+import useUserStore from '@/store/modules/user'
 import {
   getWorkflowInstance, getWorkflowBpmn, approveWorkflow, rejectWorkflow,
-  countersignWorkflow, transferWorkflow, rollbackWorkflow, terminateWorkflow
+  transferWorkflow, rollbackWorkflow, terminateWorkflow
 } from '@/api/crm/workflow'
 
 const route = useRoute()
 const { proxy } = getCurrentInstance()
+const userStore = useUserStore()
 
 const instanceId = computed(() => route.params.instanceId)
 const bpmnContainer = ref(null)
 const instance = ref({ nodes: [], status: '0', canOperate: false })
 const opinion = ref('')
-const openCountersign = ref(false)
 const openTransfer = ref(false)
-const countersignUsers = ref([])
 const transferUserId = ref(null)
 const userList = ref([])
 const pageLoading = ref(false)
@@ -117,10 +133,41 @@ let viewer = null
 const instanceStatusText = computed(() => ({ '0': '审批中', '1': '已完成', '2': '已终止' }[instance.value.status] || ''))
 const instanceStatusType = computed(() => ({ '0': 'warning', '1': 'success', '2': 'danger' }[instance.value.status] || 'info'))
 const timelineNodes = computed(() => instance.value.nodes || [])
-const rollbackNodes = computed(() => (instance.value.nodes || []).filter(n => n.approvalType === 'SINGLE'))
+const rollbackNodes = computed(() => (instance.value.nodes || []).filter(n => n.approvalType === 'SINGLE' && n.nodeOrder > 1))
+const activeNodeOrder = computed(() => {
+  const pending = (instance.value.nodes || []).filter(n => n.status === '0' && n.nodeOrder > 1)
+  if (!pending.length) return instance.value.activeNodeOrder
+  return Math.min(...pending.map(n => n.nodeOrder))
+})
+const currentStageNodes = computed(() => {
+  const order = activeNodeOrder.value
+  if (!order) return []
+  return (instance.value.nodes || []).filter(n => n.nodeOrder === order).sort((a, b) => {
+    if (a.approvalType === 'COUNTERSIGN' && b.approvalType !== 'COUNTERSIGN') return 1
+    if (b.approvalType === 'COUNTERSIGN' && a.approvalType !== 'COUNTERSIGN') return -1
+    return (a.id || 0) - (b.id || 0)
+  })
+})
+const isAdminProxy = computed(() => {
+  if (!instance.value.canOperate) return false
+  const uid = Number(userStore.id)
+  return currentStageNodes.value.some(n => n.status === '0' && Number(n.approverId) !== uid)
+})
+const waitOperateHint = computed(() => {
+  if (instance.value.pendingHint) {
+    return `当前环节待 ${instance.value.pendingHint} 处理；请使用对应账号登录，或由系统管理员代审。`
+  }
+  return '当前环节待指定审批人处理；系统管理员可代为审批。'
+})
 
 function actionText(status) {
   return { '0': '待审批', '1': '通过', '2': '驳回', '3': '转办', '4': '回退' }[status] || ''
+}
+function nodeStatusLabel(status) {
+  return actionText(status)
+}
+function nodeStatusTag(status) {
+  return { '0': 'warning', '1': 'success', '2': 'danger', '3': 'info', '4': 'info' }[status] || 'info'
 }
 function approverLabel(node) {
   if (node.approverName) return node.approverName
@@ -195,16 +242,23 @@ function applyNodeColors() {
   if (!viewer || !instance.value.nodes) return
   const canvas = viewer.get('canvas')
   const registry = viewer.get('elementRegistry')
+  const order = activeNodeOrder.value
   const orderStatus = {}
-  instance.value.nodes.forEach(n => {
-    if (!n.bpmnElementId) return
-    const cur = orderStatus[n.nodeOrder] || 'pending'
-    if (n.status === '2') orderStatus[n.nodeOrder] = 'reject'
-    else if (n.status === '1' && cur !== 'reject') orderStatus[n.nodeOrder] = 'pass'
-    else if (instance.value.status === '0' && n.id === instance.value.currentNodeId) {
-      orderStatus[n.nodeOrder] = 'current'
+  for (let o = 2; o <= 4; o++) {
+    const stageNodes = instance.value.nodes.filter(n => n.nodeOrder === o)
+    if (!stageNodes.length) continue
+    if (stageNodes.some(n => n.status === '2')) orderStatus[o] = 'reject'
+    else if (stageNodes.every(n => n.status === '1')) orderStatus[o] = 'pass'
+    else orderStatus[o] = 'pending'
+  }
+  if (instance.value.status === '0' && order) {
+    const stageNodes = instance.value.nodes.filter(n => n.nodeOrder === order)
+    const hasPending = stageNodes.some(n => n.status === '0')
+    if (hasPending) {
+      const hasCountersignPending = stageNodes.some(n => n.status === '0' && n.approvalType === 'COUNTERSIGN')
+      orderStatus[order] = hasCountersignPending ? 'countersign' : 'current'
     }
-  })
+  }
   if (instance.value.status === '1') {
     for (let i = 1; i <= 4; i++) {
       if (orderStatus[i] !== 'reject') orderStatus[i] = 'pass'
@@ -215,7 +269,13 @@ function applyNodeColors() {
     const el = registry.get(id)
     if (!el) return
     const st = orderStatus[idx + 1] || 'pending'
-    const cls = { pass: 'highlight-green', current: 'highlight-blue', reject: 'highlight-red', pending: 'highlight-gray' }[st]
+    const cls = {
+      pass: 'highlight-green',
+      current: 'highlight-blue',
+      countersign: 'highlight-orange',
+      reject: 'highlight-red',
+      pending: 'highlight-gray'
+    }[st]
     canvas.addMarker(el.id, cls)
   })
 }
@@ -229,11 +289,6 @@ function handleApprove() {
 }
 function handleReject() {
   rejectWorkflow(basePayload()).then(() => { proxy.$modal.msgSuccess('已驳回'); refresh() })
-}
-function submitCountersign() {
-  countersignWorkflow({ ...basePayload(), countersignUserIds: countersignUsers.value }).then(() => {
-    openCountersign.value = false; proxy.$modal.msgSuccess('会签人已添加'); refresh()
-  })
 }
 function submitTransfer() {
   transferWorkflow({ ...basePayload(), approverId: transferUserId.value }).then(() => {
@@ -263,10 +318,28 @@ onBeforeUnmount(() => { if (viewer) viewer.destroy() })
 </script>
 
 <style scoped>
-.bpmn-card, .action-card, .timeline-card { margin-bottom: 16px; }
+.bpmn-card, .action-card, .timeline-card, .stage-card { margin-bottom: 16px; }
 .ml-2 { margin-left: 8px; }
+.ml-1 { margin-left: 4px; }
 .mb-2 { margin-bottom: 8px; }
 .mb-3 { margin-bottom: 12px; }
+
+.pending-hint { margin: 0 0 12px; font-size: 14px; color: #303133; }
+.pending-hint .label { color: #909399; }
+.text-muted { color: #909399; }
+
+.stage-node-list { display: flex; flex-direction: column; gap: 8px; }
+.stage-node-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #f5f7fa;
+}
+.stage-node-item.is-pending { background: #fdf6ec; border: 1px solid #faecd8; }
+.node-name { flex: 1; font-weight: 500; }
+.proxy-tip { margin: 0; font-size: 12px; color: #e6a23c; }
 
 .bpmn-viewport {
   border-radius: 10px;
@@ -301,6 +374,7 @@ onBeforeUnmount(() => { if (viewer) viewer.destroy() })
 }
 .legend-pass::before { background: #f0f9eb; border-color: #67c23a; }
 .legend-current::before { background: #ecf5ff; border-color: #409eff; }
+.legend-countersign::before { background: #fdf6ec; border-color: #e6a23c; }
 .legend-pending::before { background: #f5f7fa; border-color: #dcdfe6; }
 .legend-reject::before { background: #fef0f0; border-color: #f56c6c; }
 
@@ -330,6 +404,12 @@ onBeforeUnmount(() => { if (viewer) viewer.destroy() })
 :deep(.highlight-blue .djs-visual circle) {
   stroke: #409eff !important;
   fill: #ecf5ff !important;
+  stroke-width: 2.5px !important;
+}
+:deep(.highlight-orange .djs-visual rect),
+:deep(.highlight-orange .djs-visual circle) {
+  stroke: #e6a23c !important;
+  fill: #fdf6ec !important;
   stroke-width: 2.5px !important;
 }
 :deep(.highlight-red .djs-visual rect),

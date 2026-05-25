@@ -62,8 +62,10 @@
     <pagination v-show="total > 0" :total="total" v-model:page="queryParams.pageNum" v-model:limit="queryParams.pageSize" @pagination="getList" />
     </el-card>
 
-    <el-dialog title="发起合同审批" v-model="approvalOpen" width="520px" append-to-body>
-      <el-form ref="approvalRef" :model="approvalForm" :rules="approvalRules" label-width="110px">
+    <el-dialog title="发起合同审批" v-model="approvalOpen" width="560px" append-to-body>
+      <el-alert type="info" :closable="false" show-icon class="mb-3"
+        title="会签人需在发起时选定，与主审人并行审批；同一环节全部通过后才进入下一环节。" />
+      <el-form ref="approvalRef" :model="approvalForm" :rules="approvalRules" label-width="120px">
         <el-form-item label="合同">
           <span>{{ approvalContractName }}</span>
         </el-form-item>
@@ -72,14 +74,29 @@
             <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
           </el-select>
         </el-form-item>
+        <el-form-item label="部门会签人">
+          <el-select v-model="approvalForm.deptCountersignIds" multiple filterable clearable placeholder="可选，与主审并行会签" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" :disabled="u.userId === approvalForm.deptApproverId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="财务审批人" prop="financeApproverId">
           <el-select v-model="approvalForm.financeApproverId" filterable placeholder="请选择财务审批人" style="width:100%">
             <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
           </el-select>
         </el-form-item>
+        <el-form-item label="财务会签人">
+          <el-select v-model="approvalForm.financeCountersignIds" multiple filterable clearable placeholder="可选" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" :disabled="u.userId === approvalForm.financeApproverId" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="归档审批人" prop="archiveApproverId">
           <el-select v-model="approvalForm.archiveApproverId" filterable placeholder="请选择归档审批人" style="width:100%">
             <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="归档会签人">
+          <el-select v-model="approvalForm.archiveCountersignIds" multiple filterable clearable placeholder="可选" style="width:100%">
+            <el-option v-for="u in userOptions" :key="u.userId" :label="u.nickName" :value="u.userId" :disabled="u.userId === approvalForm.archiveApproverId" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -152,7 +169,10 @@ const userOptions = ref([])
 const approvalForm = ref({
   deptApproverId: undefined,
   financeApproverId: undefined,
-  archiveApproverId: undefined
+  archiveApproverId: undefined,
+  deptCountersignIds: [],
+  financeCountersignIds: [],
+  archiveCountersignIds: []
 })
 const approvalRules = {
   deptApproverId: [{ required: true, message: '请选择部门审批人', trigger: 'change' }],
@@ -225,7 +245,14 @@ function handleStartApproval(row) {
   loadUserOptions()
   approvalContractId.value = row.id
   approvalContractName.value = row.contractName
-  approvalForm.value = { deptApproverId: undefined, financeApproverId: undefined, archiveApproverId: undefined }
+  approvalForm.value = {
+    deptApproverId: undefined,
+    financeApproverId: undefined,
+    archiveApproverId: undefined,
+    deptCountersignIds: [],
+    financeCountersignIds: [],
+    archiveCountersignIds: []
+  }
   approvalOpen.value = true
 }
 
@@ -237,7 +264,10 @@ function submitStartApproval() {
       contractId: approvalContractId.value,
       deptApproverId: approvalForm.value.deptApproverId,
       financeApproverId: approvalForm.value.financeApproverId,
-      archiveApproverId: approvalForm.value.archiveApproverId
+      archiveApproverId: approvalForm.value.archiveApproverId,
+      deptCountersignIds: approvalForm.value.deptCountersignIds,
+      financeCountersignIds: approvalForm.value.financeCountersignIds,
+      archiveCountersignIds: approvalForm.value.archiveCountersignIds
     }).then(res => {
       proxy.$modal.msgSuccess('审批流程已发起')
       approvalOpen.value = false

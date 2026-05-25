@@ -8,9 +8,9 @@
   <bpmn:process id="ContractApproval" isExecutable="false">
     <bpmn:startEvent id="StartEvent_1" name="开始"/>
     <bpmn:userTask id="Task_Submit" name="提交"/>
-    <bpmn:userTask id="Task_Dept" name="部门审批"/>
-    <bpmn:userTask id="Task_Finance" name="财务审批"/>
-    <bpmn:userTask id="Task_Archive" name="归档"/>
+    <bpmn:userTask id="Task_Dept" name="部门审批&#10;(主审+会签)"/>
+    <bpmn:userTask id="Task_Finance" name="财务审批&#10;(主审+会签)"/>
+    <bpmn:userTask id="Task_Archive" name="归档&#10;(主审+会签)"/>
     <bpmn:endEvent id="EndEvent_1" name="结束"/>
     <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Task_Submit"/>
     <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Submit" targetRef="Task_Dept"/>

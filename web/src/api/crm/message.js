@@ -49,3 +49,11 @@ export function getUnreadCount() {
 export function getUnreadList() {
   return request({ url: '/crm/message/record/unread-list', method: 'get' })
 }
+
+export function getInboxList(limit = 8) {
+  return request({ url: '/crm/message/record/inbox-list', method: 'get', params: { limit } })
+}
+
+export function markMessageRead(id) {
+  return request({ url: '/crm/message/record/read/' + id, method: 'put' })
+}

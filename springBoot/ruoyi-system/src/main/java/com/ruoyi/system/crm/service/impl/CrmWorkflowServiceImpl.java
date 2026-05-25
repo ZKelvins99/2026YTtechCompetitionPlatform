@@ -2,9 +2,14 @@ package com.ruoyi.system.crm.service.impl;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+import com.ruoyi.common.core.domain.entity.SysRole;
+import com.ruoyi.common.core.domain.model.LoginUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
@@ -96,6 +101,18 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             if (i == 1)
             {
                 deptNode = node;
+                insertCountersignNodes(instance.getId(), node.getNodeOrder(), node.getNodeName(),
+                    request.getDeptCountersignIds(), request.getDeptApproverId());
+            }
+            else if (i == 2)
+            {
+                insertCountersignNodes(instance.getId(), node.getNodeOrder(), node.getNodeName(),
+                    request.getFinanceCountersignIds(), request.getFinanceApproverId());
+            }
+            else if (i == 3)
+            {
+                insertCountersignNodes(instance.getId(), node.getNodeOrder(), node.getNodeName(),
+                    request.getArchiveCountersignIds(), request.getArchiveApproverId());
             }
         }
 
@@ -125,7 +142,8 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             }
         }
         instance.setNodes(nodes);
-        instance.setCanOperate(resolveCanOperate(instance, userId));
+        syncCurrentNodePointer(instance, nodes);
+        enrichStageSummary(instance, nodes, userId);
         instance.setBpmnXml(BPMN_TEMPLATE);
         return instance;
     }
@@ -145,7 +163,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     public CrmWorkflowInstance approve(CrmWorkflowActionRequest request, Long userId)
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         fillApproverIfMissing(current, userId);
 
@@ -156,21 +174,13 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
 
         if (!isCurrentOrderAllApproved(instance.getId(), current.getNodeOrder()))
         {
+            List<CrmWorkflowNode> nodes = workflowMapper.selectNodesByInstanceId(instance.getId());
+            syncCurrentNodePointer(instance, nodes);
+            workflowMapper.updateInstance(instance);
             return getInstanceDetail(instance.getId(), userId);
         }
 
-        CrmWorkflowNode next = findPrimaryNodeByOrder(instance.getId(), current.getNodeOrder() + 1);
-        if (next != null)
-        {
-            instance.setCurrentNodeId(next.getId());
-            workflowMapper.updateInstance(instance);
-        }
-        else
-        {
-            completeInstance(instance);
-            contractMapper.updateContractStatus(instance.getBusinessId(),
-                contractMapper.selectStatusIdByCode("ACTIVE"));
-        }
+        advanceToNextOrder(instance, current.getNodeOrder());
         return getInstanceDetail(instance.getId(), userId);
     }
 
@@ -179,7 +189,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     public CrmWorkflowInstance reject(CrmWorkflowActionRequest request, Long userId)
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         fillApproverIfMissing(current, userId);
 
@@ -205,7 +215,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     public CrmWorkflowInstance countersign(CrmWorkflowActionRequest request, Long userId)
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
 
         if (request.getCountersignUserIds() == null || request.getCountersignUserIds().isEmpty())
@@ -234,7 +244,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     public CrmWorkflowInstance transfer(CrmWorkflowActionRequest request, Long userId)
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
 
         if (request.getApproverId() == null)
@@ -272,7 +282,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             throw new ServiceException("目标节点无效");
         }
 
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         current.setStatus("4");
         current.setOpinion(opinion);
@@ -290,7 +300,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     public CrmWorkflowInstance terminate(CrmWorkflowActionRequest request, Long userId)
     {
         CrmWorkflowInstance instance = loadRunningInstance(request.getInstanceId());
-        CrmWorkflowNode current = getCurrentNode(instance);
+        CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         current.setStatus("2");
         current.setOpinion(StringUtils.defaultString(request.getOpinion(), "流程终止"));
@@ -320,14 +330,41 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         return instance;
     }
 
-    private CrmWorkflowNode getCurrentNode(CrmWorkflowInstance instance)
+    private CrmWorkflowNode resolveOperatingNode(CrmWorkflowInstance instance, Long userId)
     {
-        CrmWorkflowNode node = workflowMapper.selectNodeById(instance.getCurrentNodeId());
-        if (node == null)
+        List<CrmWorkflowNode> nodes = workflowMapper.selectNodesByInstanceId(instance.getId());
+        Integer activeOrder = resolveActiveOrder(nodes);
+        if (activeOrder == null)
         {
-            throw new ServiceException("当前节点不存在");
+            throw new ServiceException("当前无待办节点");
         }
-        return node;
+        List<CrmWorkflowNode> pending = pendingAtOrder(nodes, activeOrder);
+        if (pending.isEmpty())
+        {
+            throw new ServiceException("当前环节已无待办");
+        }
+        if (isWorkflowPrivileged(userId))
+        {
+            if (instance.getCurrentNodeId() != null)
+            {
+                for (CrmWorkflowNode n : pending)
+                {
+                    if (n.getId().equals(instance.getCurrentNodeId()))
+                    {
+                        return n;
+                    }
+                }
+            }
+            return pending.get(0);
+        }
+        for (CrmWorkflowNode n : pending)
+        {
+            if (userId != null && userId.equals(n.getApproverId()))
+            {
+                return n;
+            }
+        }
+        throw new ServiceException("您不是当前环节审批人，无权操作");
     }
 
     private void assertCanApprove(CrmWorkflowNode node, Long userId)
@@ -336,7 +373,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         {
             throw new ServiceException("当前节点不可操作");
         }
-        if (SecurityUtils.isAdmin(userId))
+        if (isWorkflowPrivileged(userId))
         {
             return;
         }
@@ -354,22 +391,189 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         }
     }
 
-    private boolean resolveCanOperate(CrmWorkflowInstance instance, Long userId)
+    private void enrichStageSummary(CrmWorkflowInstance instance, List<CrmWorkflowNode> nodes, Long userId)
     {
-        if (!"0".equals(instance.getStatus()) || instance.getCurrentNodeId() == null)
+        instance.setCanOperate(resolveCanOperate(instance, nodes, userId));
+        Integer activeOrder = resolveActiveOrder(nodes);
+        instance.setActiveNodeOrder(activeOrder);
+        if (activeOrder != null && activeOrder >= 1 && activeOrder <= NODE_NAMES.length)
+        {
+            instance.setCurrentStageName(NODE_NAMES[activeOrder - 1]);
+        }
+        instance.setPendingHint(buildPendingHint(nodes, activeOrder));
+    }
+
+    private boolean resolveCanOperate(CrmWorkflowInstance instance, List<CrmWorkflowNode> nodes, Long userId)
+    {
+        if (!"0".equals(instance.getStatus()))
         {
             return false;
         }
-        CrmWorkflowNode current = workflowMapper.selectNodeById(instance.getCurrentNodeId());
-        if (current == null || !"0".equals(current.getStatus()))
+        Integer activeOrder = resolveActiveOrder(nodes);
+        if (activeOrder == null)
         {
             return false;
         }
+        List<CrmWorkflowNode> pending = pendingAtOrder(nodes, activeOrder);
+        if (pending.isEmpty())
+        {
+            return false;
+        }
+        if (isWorkflowPrivileged(userId))
+        {
+            return true;
+        }
+        return pending.stream().anyMatch(n -> userId != null && userId.equals(n.getApproverId()));
+    }
+
+    private void syncCurrentNodePointer(CrmWorkflowInstance instance, List<CrmWorkflowNode> nodes)
+    {
+        if (!"0".equals(instance.getStatus()))
+        {
+            return;
+        }
+        Integer activeOrder = resolveActiveOrder(nodes);
+        if (activeOrder == null)
+        {
+            return;
+        }
+        List<CrmWorkflowNode> pending = pendingAtOrder(nodes, activeOrder);
+        if (pending.isEmpty())
+        {
+            return;
+        }
+        Long pointer = instance.getCurrentNodeId();
+        boolean pointerValid = pointer != null && pending.stream().anyMatch(n -> n.getId().equals(pointer));
+        if (!pointerValid)
+        {
+            instance.setCurrentNodeId(pending.get(0).getId());
+            workflowMapper.updateInstance(instance);
+        }
+    }
+
+    private void advanceToNextOrder(CrmWorkflowInstance instance, int completedOrder)
+    {
+        List<CrmWorkflowNode> nodes = workflowMapper.selectNodesByInstanceId(instance.getId());
+        int nextOrder = completedOrder + 1;
+        List<CrmWorkflowNode> nextPending = nodes.stream()
+            .filter(n -> n.getNodeOrder() != null && n.getNodeOrder() == nextOrder && "0".equals(n.getStatus()))
+            .collect(Collectors.toList());
+        if (!nextPending.isEmpty())
+        {
+            instance.setCurrentNodeId(nextPending.get(0).getId());
+            workflowMapper.updateInstance(instance);
+            return;
+        }
+        if (nextOrder <= NODE_NAMES.length)
+        {
+            CrmWorkflowNode next = findPrimaryNodeByOrder(instance.getId(), nextOrder);
+            if (next != null)
+            {
+                instance.setCurrentNodeId(next.getId());
+                workflowMapper.updateInstance(instance);
+                return;
+            }
+        }
+        completeInstance(instance);
+        contractMapper.updateContractStatus(instance.getBusinessId(),
+            contractMapper.selectStatusIdByCode("ACTIVE"));
+    }
+
+    private Integer resolveActiveOrder(List<CrmWorkflowNode> nodes)
+    {
+        return nodes.stream()
+            .filter(n -> "0".equals(n.getStatus()) && n.getNodeOrder() != null && n.getNodeOrder() > 1)
+            .map(CrmWorkflowNode::getNodeOrder)
+            .min(Integer::compareTo)
+            .orElse(null);
+    }
+
+    private List<CrmWorkflowNode> pendingAtOrder(List<CrmWorkflowNode> nodes, int order)
+    {
+        return nodes.stream()
+            .filter(n -> n.getNodeOrder() != null && n.getNodeOrder() == order && "0".equals(n.getStatus()))
+            .collect(Collectors.toList());
+    }
+
+    private String buildPendingHint(List<CrmWorkflowNode> nodes, Integer activeOrder)
+    {
+        if (activeOrder == null)
+        {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        for (CrmWorkflowNode n : pendingAtOrder(nodes, activeOrder))
+        {
+            String name = StringUtils.isNotEmpty(n.getApproverName()) ? n.getApproverName() : "未指定";
+            if ("COUNTERSIGN".equals(n.getApprovalType()))
+            {
+                parts.add(name + "（会签）");
+            }
+            else
+            {
+                parts.add(name + "（主审）");
+            }
+        }
+        return parts.isEmpty() ? null : String.join("、", parts);
+    }
+
+    private void insertCountersignNodes(Long instanceId, int nodeOrder, String nodeName,
+        List<Long> userIds, Long primaryApproverId)
+    {
+        if (userIds == null || userIds.isEmpty())
+        {
+            return;
+        }
+        Set<Long> added = new HashSet<>();
+        for (Long uid : userIds)
+        {
+            if (uid == null || uid.equals(primaryApproverId) || !added.add(uid))
+            {
+                continue;
+            }
+            CrmWorkflowNode csNode = new CrmWorkflowNode();
+            csNode.setInstanceId(instanceId);
+            csNode.setNodeName(nodeName);
+            csNode.setNodeOrder(nodeOrder);
+            csNode.setApproverId(uid);
+            csNode.setApprovalType("COUNTERSIGN");
+            csNode.setStatus("0");
+            workflowMapper.insertNode(csNode);
+        }
+    }
+
+    private boolean isWorkflowPrivileged(Long userId)
+    {
         if (SecurityUtils.isAdmin(userId))
         {
             return true;
         }
-        return userId != null && userId.equals(current.getApproverId());
+        try
+        {
+            LoginUser loginUser = SecurityUtils.getLoginUser();
+            if (loginUser == null || loginUser.getUser() == null)
+            {
+                return false;
+            }
+            if (loginUser.getUser().isAdmin())
+            {
+                return true;
+            }
+            if (loginUser.getUser().getRoles() != null)
+            {
+                for (SysRole role : loginUser.getUser().getRoles())
+                {
+                    if (role != null && role.isAdmin())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        catch (Exception ignored)
+        {
+        }
+        return false;
     }
 
     private boolean isCurrentOrderAllApproved(Long instanceId, int nodeOrder)

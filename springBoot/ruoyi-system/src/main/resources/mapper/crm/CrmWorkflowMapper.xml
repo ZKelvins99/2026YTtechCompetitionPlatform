@@ -98,6 +98,7 @@
         update crm_workflow_node
         <set>
             <if test="approverId != null">approver_id = #{approverId},</if>
+            <if test="approvalType != null">approval_type = #{approvalType},</if>
             <if test="status != null">status = #{status},</if>
             <if test="opinion != null">opinion = #{opinion},</if>
             <if test="approveTime != null">approve_time = #{approveTime},</if>
