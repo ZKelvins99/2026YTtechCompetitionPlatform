@@ -1,7 +1,5 @@
 import { createApp } from 'vue'
 
-import '@/assets/styles/tailwind.css' // DaisyUI + Tailwind theme bridge
-
 import Cookies from 'js-cookie'
 
 import ElementPlus from 'element-plus'
