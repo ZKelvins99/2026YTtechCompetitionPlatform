@@ -25,6 +25,7 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
 import com.ruoyi.system.crm.domain.CrmBehaviorTaskStatus;
 import com.ruoyi.system.crm.domain.CrmCustomerBehavior;
+import com.ruoyi.system.crm.domain.CrmCustomerBehaviorConstants;
 import com.ruoyi.system.crm.domain.CrmCustomerBehaviorImportTemplate;
 import com.ruoyi.system.crm.mapper.CrmCustomerBehaviorMapper;
 import com.ruoyi.system.crm.service.ICrmCustomerBehaviorService;
@@ -35,7 +36,7 @@ import jakarta.servlet.http.HttpServletResponse;
 @Service
 public class CrmCustomerBehaviorServiceImpl implements ICrmCustomerBehaviorService
 {
-    static final String[] BEHAVIOR_TYPES = { "电话沟通", "拜访", "邮件", "演示" };
+    static final String[] BEHAVIOR_TYPES = CrmCustomerBehaviorConstants.BEHAVIOR_TYPES;
 
     @Autowired
     private CrmCustomerBehaviorMapper crmCustomerBehaviorMapper;

@@ -20,14 +20,16 @@ spring:
             initialSize: 5
             # 最小连接池数量
             minIdle: 10
-            # 最大连接池数量
-            maxActive: 20
+            # 最大连接池数量（并行导入 consumer-threads 建议 ≤ maxActive 的一半）
+            maxActive: 30
             # 配置获取连接等待超时的时间
             maxWait: 60000
             # 配置连接超时时间
             connectTimeout: 30000
             # 配置网络超时时间（大批量导入需足够长，单位毫秒）
             socketTimeout: 600000
+            # Oracle JDBC 批量默认值（与 CRM 行为导入 executeBatch 批次一致）
+            connection-properties: oracle.jdbc.defaultBatchValue=2000
             # 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒
             timeBetweenEvictionRunsMillis: 60000
             # 配置一个连接在池中最小生存的时间，单位是毫秒

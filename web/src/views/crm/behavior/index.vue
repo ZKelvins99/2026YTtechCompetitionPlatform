@@ -91,7 +91,7 @@
           <div class="el-upload__tip">仅支持 xlsx；进度保存在 Redis，切换页面后回来仍可查看</div>
         </template>
       </el-upload>
-      <div v-if="importRunning || (taskStatus && taskStatus.status !== 'RUNNING')" class="import-progress-panel">
+      <div v-if="showImportProgress" class="import-progress-panel">
         <el-progress :percentage="progressPercent" :status="progressStatus" :stroke-width="14" />
         <div class="progress-text" v-if="taskStatus">
           <div class="progress-row">
@@ -124,6 +124,7 @@
         v-if="tableWidth > 0 && tableHeight > 0"
         :columns="tableColumns"
         :data="list"
+        :row-key="rowKey"
         :width="tableWidth"
         :height="tableHeight"
         :row-height="36"
@@ -195,6 +196,17 @@ let persistTimer = null
 
 const importRunning = computed(() => taskStatus.value?.status === 'RUNNING')
 
+/** 仅在导入进行中或弹窗内展示刚结束的结果，避免 DONE 后仍锁住界面 */
+const showImportProgress = computed(() => {
+  if (!taskStatus.value) return false
+  if (importRunning.value) return true
+  return openImport.value && (taskStatus.value.status === 'DONE' || taskStatus.value.status === 'FAILED')
+})
+
+function rowKey(row) {
+  return row.id
+}
+
 const tableColumns = [
   {
     key: 'rowIndex',
@@ -203,7 +215,6 @@ const tableColumns = [
     align: 'center',
     cellRenderer: ({ rowIndex }) => h('span', { class: 'cell-index' }, rowIndex + 1)
   },
-  { key: 'id', dataKey: 'id', title: 'ID', width: 100, align: 'center' },
   { key: 'customerId', dataKey: 'customerId', title: '客户ID', width: 100, align: 'center' },
   { key: 'behaviorType', dataKey: 'behaviorType', title: '行为类型', width: 120, align: 'center' },
   {
@@ -353,15 +364,18 @@ async function fetchDbTotal(refresh = false) {
 }
 
 function applyActiveImportTask(task) {
-  if (!task || !task.taskId) return
-  taskStatus.value = task
-  if (task.status === 'RUNNING') {
-    if (pollingTaskId !== task.taskId) {
-      beginPollTask(task.taskId)
-    }
-  } else if (task.status === 'FAILED' || task.status === 'DONE') {
-    stopPoll()
+  if (!task || !task.taskId || task.status !== 'RUNNING') {
+    return
   }
+  taskStatus.value = task
+  if (pollingTaskId !== task.taskId) {
+    beginPollTask(task.taskId)
+  }
+}
+
+function clearImportTaskState() {
+  stopPoll()
+  taskStatus.value = null
 }
 
 let loadLock = false
@@ -440,6 +454,9 @@ async function reloadList() {
 }
 
 function openImportDialog() {
+  if (!importRunning.value) {
+    clearImportTaskState()
+  }
   openImport.value = true
 }
 
@@ -463,6 +480,9 @@ function startImport() {
     proxy.$modal.msgWarning('已有导入任务进行中，请等待完成')
     return
   }
+  if (taskStatus.value && taskStatus.value.status !== 'RUNNING') {
+    clearImportTaskState()
+  }
   if (!selectedFile.value) {
     proxy.$modal.msgError('请选择 Excel 文件')
     return
@@ -485,23 +505,47 @@ function beginPollTask(taskId) {
   pollingTaskId = taskId
   const fetchOnce = () => {
     getBehaviorTask(taskId).then(r => {
-      taskStatus.value = r.data
-      if (r.data.status === 'DONE') {
-        stopPoll()
-        const imported = Number(r.data.processed) || 0
+      const data = r.data
+      if (!data) {
+        clearImportTaskState()
+        return
+      }
+      if (data.status === 'RUNNING') {
+        taskStatus.value = data
+        return
+      }
+      stopPoll()
+      taskStatus.value = data
+      if (data.status === 'DONE') {
+        const imported = Number(data.processed) || 0
         if (imported <= 0) {
           proxy.$modal.msgError('导入完成但未写入任何数据')
         } else {
           proxy.$modal.msgSuccess(`成功导入 ${imported.toLocaleString()} 条数据`)
           reloadList()
         }
-      } else if (r.data.status === 'FAILED') {
-        stopPoll()
+        scheduleClearImportState()
+      } else if (data.status === 'FAILED') {
+        proxy.$modal.msgError(data.message || '导入失败')
+        scheduleClearImportState()
       }
     }).catch(() => {})
   }
   fetchOnce()
   pollTimer = setInterval(fetchOnce, 500)
+}
+
+let clearImportTimer = null
+function scheduleClearImportState() {
+  if (clearImportTimer) {
+    clearTimeout(clearImportTimer)
+  }
+  clearImportTimer = setTimeout(() => {
+    clearImportTimer = null
+    if (!importRunning.value) {
+      taskStatus.value = null
+    }
+  }, 4000)
 }
 
 function stopPoll() {
@@ -514,6 +558,9 @@ function stopPoll() {
 
 function closeImportDialog() {
   openImport.value = false
+  if (!importRunning.value) {
+    clearImportTaskState()
+  }
 }
 
 function handleClear() {
@@ -545,8 +592,12 @@ onBeforeUnmount(() => {
     clearTimeout(persistTimer)
     persistTimer = null
   }
+  if (clearImportTimer) {
+    clearTimeout(clearImportTimer)
+    clearImportTimer = null
+  }
   persistCacheNow()
-  stopPoll()
+  clearImportTaskState()
 })
 </script>
 

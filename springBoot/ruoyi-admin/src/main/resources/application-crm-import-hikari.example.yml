@@ -1,0 +1,29 @@
+# 示例：若主数据源改用 HikariCP + Oracle 时的批量导入相关配置（勿直接启用，需替换 druid 主配置）
+spring:
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    driver-class-name: oracle.jdbc.OracleDriver
+    url: jdbc:oracle:thin:@127.0.0.1:1521:orcl
+    username: your_user
+    password: your_password
+    hikari:
+      pool-name: CrmBehaviorImportPool
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # 批量导入须关闭连接池自动提交，由业务按批 commit
+      auto-commit: false
+      data-source-properties:
+        oracle.jdbc.defaultBatchValue: "2000"
+
+crm:
+  behavior:
+    import:
+      batch-size: 2000
+      consumer-threads: 4
+      queue-batch-capacity: 48
+      parallel-parse: true
+      progress-step: 5000
+      oracle-default-batch-value: 2000

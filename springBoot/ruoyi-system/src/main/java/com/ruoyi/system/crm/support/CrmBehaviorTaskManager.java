@@ -168,6 +168,9 @@ public class CrmBehaviorTaskManager
         return status;
     }
 
+    /**
+     * 仅返回进行中的导入任务；已完成/失败任务会清理 active 标记并返回 null。
+     */
     public CrmBehaviorTaskStatus getActiveImportTask(Long userId)
     {
         if (userId == null)
@@ -179,7 +182,20 @@ public class CrmBehaviorTaskManager
         {
             return null;
         }
-        return getTask(taskId);
+        CrmBehaviorTaskStatus task = loadTask(taskId);
+        if (task == null)
+        {
+            redisCache.deleteObject(activeImportKey(userId));
+            return null;
+        }
+        if (!"RUNNING".equals(task.getStatus()))
+        {
+            clearActiveImportIfMatch(userId, taskId);
+            return null;
+        }
+        refreshMetrics(task);
+        saveTask(task);
+        return task;
     }
 
     private void clearActiveImportIfMatch(Long userId, String taskId)

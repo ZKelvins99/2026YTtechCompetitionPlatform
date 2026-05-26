@@ -254,7 +254,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
 
         current.setApproverId(request.getApproverId());
         current.setStatus("3");
-        current.setOpinion(StringUtils.defaultString(request.getOpinion(), "转办"));
+        current.setOpinion(StringUtils.isNotEmpty(request.getOpinion()) ? request.getOpinion() : "转办");
         current.setApproveTime(new Date());
         workflowMapper.updateNode(current);
 
@@ -282,6 +282,27 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             throw new ServiceException("目标节点无效");
         }
 
+        List<CrmWorkflowNode> nodes = workflowMapper.selectNodesByInstanceId(instanceId);
+        Integer activeOrder = resolveActiveOrder(nodes);
+        List<CrmWorkflowNode> allowedTargets = resolveRollbackTargets(nodes, activeOrder);
+        if (allowedTargets.isEmpty())
+        {
+            throw new ServiceException("当前环节之前无已通过的审批节点，无法回退");
+        }
+        boolean targetAllowed = allowedTargets.stream().anyMatch(n -> n.getId().equals(targetNodeId));
+        if (!targetAllowed)
+        {
+            throw new ServiceException("只能回退到已审批通过且早于当前环节的节点");
+        }
+        if (!"SINGLE".equals(target.getApprovalType()))
+        {
+            throw new ServiceException("只能回退到主审节点");
+        }
+        if (target.getNodeOrder() == null || activeOrder == null || target.getNodeOrder() >= activeOrder)
+        {
+            throw new ServiceException("不能回退到当前或之后的环节");
+        }
+
         CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         current.setStatus("4");
@@ -303,7 +324,7 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
         CrmWorkflowNode current = resolveOperatingNode(instance, userId);
         assertCanApprove(current, userId);
         current.setStatus("2");
-        current.setOpinion(StringUtils.defaultString(request.getOpinion(), "流程终止"));
+        current.setOpinion(StringUtils.isNotEmpty(request.getOpinion()) ? request.getOpinion() : "流程终止");
         current.setApproveTime(new Date());
         workflowMapper.updateNode(current);
 
@@ -401,6 +422,9 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
             instance.setCurrentStageName(NODE_NAMES[activeOrder - 1]);
         }
         instance.setPendingHint(buildPendingHint(nodes, activeOrder));
+        List<CrmWorkflowNode> rollbackTargets = resolveRollbackTargets(nodes, activeOrder);
+        instance.setRollbackTargets(rollbackTargets);
+        instance.setCanRollback(instance.getCanOperate() != null && instance.getCanOperate() && !rollbackTargets.isEmpty());
     }
 
     private boolean resolveCanOperate(CrmWorkflowInstance instance, List<CrmWorkflowNode> nodes, Long userId)
@@ -579,9 +603,48 @@ public class CrmWorkflowServiceImpl implements ICrmWorkflowService
     private boolean isCurrentOrderAllApproved(Long instanceId, int nodeOrder)
     {
         List<CrmWorkflowNode> nodes = workflowMapper.selectNodesByInstanceId(instanceId);
+        return isOrderFullyApproved(nodes, nodeOrder);
+    }
+
+    /**
+     * 指定回退目标：当前环节之前、该环节全部节点均已通过的主审节点（不含提交节点）。
+     */
+    private List<CrmWorkflowNode> resolveRollbackTargets(List<CrmWorkflowNode> nodes, Integer activeOrder)
+    {
+        List<CrmWorkflowNode> targets = new ArrayList<>();
+        if (activeOrder == null || activeOrder <= 2)
+        {
+            return targets;
+        }
+        for (int order = 2; order < activeOrder; order++)
+        {
+            final int stageOrder = order;
+            if (!isOrderFullyApproved(nodes, stageOrder))
+            {
+                continue;
+            }
+            CrmWorkflowNode primary = nodes.stream()
+                .filter(n -> n.getNodeOrder() != null && n.getNodeOrder() == stageOrder
+                    && "SINGLE".equals(n.getApprovalType()))
+                .findFirst()
+                .orElse(null);
+            if (primary != null)
+            {
+                targets.add(primary);
+            }
+        }
+        return targets;
+    }
+
+    private boolean isOrderFullyApproved(List<CrmWorkflowNode> nodes, int nodeOrder)
+    {
         List<CrmWorkflowNode> sameOrder = nodes.stream()
-            .filter(n -> n.getNodeOrder() == nodeOrder)
+            .filter(n -> n.getNodeOrder() != null && n.getNodeOrder() == nodeOrder)
             .collect(Collectors.toList());
+        if (sameOrder.isEmpty())
+        {
+            return false;
+        }
         return sameOrder.stream().allMatch(n -> "1".equals(n.getStatus()));
     }
 

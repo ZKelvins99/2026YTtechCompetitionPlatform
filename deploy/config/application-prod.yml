@@ -1,0 +1,22 @@
+# 生产环境覆盖配置（部署在服务器 /opt/ruoyi/config/application-prod.yml）
+# 启动时追加：--spring.config.additional-location=/opt/ruoyi/config/application-prod.yml
+
+ruoyi:
+  profile: /opt/ruoyi/uploadPath
+
+logging:
+  level:
+    com.ruoyi: info
+    org.springframework: warn
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  devtools:
+    restart:
+      enabled: false
+
+referer:
+  allowed-domains: 128.128.100.16,localhost,127.0.0.1

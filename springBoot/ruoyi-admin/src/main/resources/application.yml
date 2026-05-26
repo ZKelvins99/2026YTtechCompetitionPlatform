@@ -1,7 +1,7 @@
 # 项目相关配置
 ruoyi:
   # 名称
-  name: RuoYi
+  name: 智能客户关系管理平台
   # 版本
   version: 3.9.2
   # 版权年份
@@ -125,6 +125,17 @@ referer:
   enabled: false
   # 允许的域名列表
   allowed-domains: localhost,127.0.0.1,ruoyi.vip,www.ruoyi.vip
+
+# CRM 行为数据 Excel 批量导入（EasyExcel 流式 + JDBC 按批提交）
+crm:
+  behavior:
+    import:
+      batch-size: 2000
+      consumer-threads: 4
+      queue-batch-capacity: 48
+      parallel-parse: true
+      progress-step: 5000
+      oracle-default-batch-value: 2000
 
 # 防止XSS攻击
 xss:

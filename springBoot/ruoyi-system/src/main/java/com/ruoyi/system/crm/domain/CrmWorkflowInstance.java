@@ -44,6 +44,12 @@ public class CrmWorkflowInstance extends BaseEntity
     /** BPMN 流程图 XML（与实例一并返回，避免单独接口丢数据） */
     private String bpmnXml;
 
+    /** 允许指定回退的目标节点（仅含已审批通过且早于当前环节的主审节点） */
+    private List<CrmWorkflowNode> rollbackTargets;
+
+    /** 当前是否可执行回退 */
+    private Boolean canRollback;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getProcessType() { return processType; }
@@ -76,4 +82,8 @@ public class CrmWorkflowInstance extends BaseEntity
     public void setPendingHint(String pendingHint) { this.pendingHint = pendingHint; }
     public String getBpmnXml() { return bpmnXml; }
     public void setBpmnXml(String bpmnXml) { this.bpmnXml = bpmnXml; }
+    public List<CrmWorkflowNode> getRollbackTargets() { return rollbackTargets; }
+    public void setRollbackTargets(List<CrmWorkflowNode> rollbackTargets) { this.rollbackTargets = rollbackTargets; }
+    public Boolean getCanRollback() { return canRollback; }
+    public void setCanRollback(Boolean canRollback) { this.canRollback = canRollback; }
 }

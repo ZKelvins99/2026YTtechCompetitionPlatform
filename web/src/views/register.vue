@@ -13,7 +13,7 @@
     <div class="tw-card relative z-10 w-full max-w-md p-8 sm:p-10">
       <div class="mb-8 text-center">
         <h3 class="text-2xl font-bold text-slate-800">{{ title }}</h3>
-        <p class="mt-2 text-sm text-slate-500">创建新账号，加入管理平台</p>
+        <p class="mt-2 text-sm text-slate-500">创建新账号，加入智能客户关系管理平台</p>
       </div>
 
       <el-form ref="registerRef" :model="registerForm" :rules="registerRules" class="tw-input-shell">

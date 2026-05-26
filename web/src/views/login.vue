@@ -1,41 +1,40 @@
 <template>
-  <div class="login relative flex min-h-screen overflow-hidden bg-slate-950">
-    <!-- 背景装饰 -->
-    <div class="pointer-events-none absolute inset-0">
-      <div class="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-brand-600/30 blur-3xl" />
-      <div class="absolute bottom-0 right-0 h-[28rem] w-[28rem] rounded-full bg-indigo-500/20 blur-3xl" />
+  <div class="login relative flex min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-sky-50 to-indigo-50/90">
+    <!-- 亮色背景装饰 -->
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="absolute -left-24 -top-24 h-[22rem] w-[22rem] rounded-full bg-sky-200/70 blur-3xl" />
+      <div class="absolute right-[-6rem] top-1/4 h-80 w-80 rounded-full bg-brand-200/60 blur-3xl" />
+      <div class="absolute bottom-[-4rem] left-1/3 h-96 w-96 rounded-full bg-indigo-100/80 blur-3xl" />
       <div
-        class="absolute inset-0 opacity-30"
-        style="background-image: url('../assets/images/login-background.jpg'); background-size: cover; background-position: center;"
+        class="absolute inset-0 opacity-[0.35]"
+        style="background-image: radial-gradient(circle at 1px 1px, rgb(148 163 184 / 0.15) 1px, transparent 0); background-size: 28px 28px;"
       />
-      <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px]" />
     </div>
 
     <div class="relative z-10 flex w-full flex-col lg:flex-row">
       <!-- 左侧品牌区 -->
       <div class="hidden flex-1 flex-col justify-center px-12 py-16 lg:flex xl:px-20">
-        <div class="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-brand-200 backdrop-blur">
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          2026 技术比武 · CRM 平台
+        <div class="mb-6 inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/80 bg-white/70 px-4 py-1.5 text-xs font-medium text-brand-700 shadow-sm backdrop-blur-sm">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          {{ title }}
         </div>
-        <h1 class="max-w-lg text-4xl font-bold tracking-tight text-white xl:text-5xl">
-          智能客户关系
-          <span class="bg-gradient-to-r from-brand-300 to-cyan-300 bg-clip-text text-transparent">管理平台</span>
+        <h1 class="max-w-lg text-4xl font-bold tracking-tight text-slate-800 xl:text-5xl">
+          {{ title }}
         </h1>
-        <p class="mt-4 max-w-md text-base leading-relaxed text-slate-400">
+        <p class="mt-4 max-w-md text-base leading-relaxed text-slate-600">
           客户、商机、合同、工作台一体化；支持工作流审批与数据监控大屏。
         </p>
-        <ul class="mt-10 space-y-3 text-sm text-slate-400">
+        <ul class="mt-10 space-y-3 text-sm text-slate-600">
           <li class="flex items-center gap-3">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/20 text-brand-300">✓</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-brand-600">✓</span>
             可拖拽个性化工作台
           </li>
           <li class="flex items-center gap-3">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/20 text-brand-300">✓</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-brand-600">✓</span>
             CRM 全链路业务管理
           </li>
           <li class="flex items-center gap-3">
-            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/20 text-brand-300">✓</span>
+            <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-100 text-brand-600">✓</span>
             实时数据监控与审计
           </li>
         </ul>
@@ -43,7 +42,12 @@
 
       <!-- 右侧登录卡片 -->
       <div class="flex flex-1 items-center justify-center px-6 py-12 sm:px-10">
-        <div class="tw-card w-full max-w-md p-8 sm:p-10">
+        <div class="login-card w-full max-w-md p-8 sm:p-10">
+          <div class="mb-2 flex justify-center lg:hidden">
+            <span class="rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700">
+              {{ title }}
+            </span>
+          </div>
           <div class="mb-8 text-center lg:text-left">
             <h3 class="text-2xl font-bold text-slate-800">{{ title }}</h3>
             <p class="mt-2 text-sm text-slate-500">欢迎回来，请登录您的账号</p>
@@ -88,7 +92,7 @@
                 </el-input>
                 <img
                   :src="codeUrl"
-                  class="h-10 w-[30%] cursor-pointer rounded-xl border border-slate-200 object-cover transition hover:border-brand-400"
+                  class="h-10 w-[30%] cursor-pointer rounded-xl border border-slate-200 bg-white object-cover transition hover:border-brand-400 hover:shadow-sm"
                   alt="验证码"
                   @click="getCode"
                 />
@@ -123,7 +127,7 @@
       </div>
     </div>
 
-    <div class="absolute bottom-0 z-10 w-full py-4 text-center text-xs tracking-wide text-slate-500">
+    <div class="absolute bottom-0 z-10 w-full py-4 text-center text-xs tracking-wide text-slate-400">
       <span>{{ footerContent }}</span>
     </div>
   </div>
@@ -232,14 +236,35 @@ getCookie()
 :deep(.el-form-item) {
   margin-bottom: 18px;
 }
-html.dark .login .tw-card {
-  border-color: rgb(51 65 85 / 0.5);
-  background-color: rgb(15 23 42 / 0.9);
+
+.login-card {
+  border-radius: 1rem;
+  border: 1px solid rgb(226 232 240 / 0.9);
+  background: rgb(255 255 255 / 0.92);
+  box-shadow:
+    0 4px 6px -1px rgb(15 23 42 / 0.04),
+    0 20px 50px -12px rgb(37 99 235 / 0.12);
+  backdrop-filter: blur(12px);
 }
+
+html.dark .login {
+  background: linear-gradient(to bottom right, rgb(15 23 42), rgb(30 41 59), rgb(15 23 42));
+}
+html.dark .login .login-card {
+  border-color: rgb(51 65 85 / 0.6);
+  background-color: rgb(255 255 255 / 0.06);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.35);
+}
+html.dark .login h1,
 html.dark .login h3 {
   color: #f1f5f9;
 }
-html.dark .login p {
+html.dark .login .text-slate-800 {
+  color: #f1f5f9;
+}
+html.dark .login .text-slate-600,
+html.dark .login .text-slate-500,
+html.dark .login .text-slate-400 {
   color: #94a3b8;
 }
 </style>

@@ -55,10 +55,13 @@
           <el-button type="success" @click="handleApprove">通过</el-button>
           <el-button type="danger" @click="handleReject">驳回</el-button>
           <el-button @click="openTransfer = true">转办</el-button>
-          <el-dropdown @command="handleRollback">
-            <el-button class="ml-1">回退<el-icon class="el-icon--right"><arrow-down /></el-icon></el-button>
+          <el-dropdown :disabled="!canRollback" @command="handleRollback">
+            <el-button class="ml-1" :disabled="!canRollback">
+              回退<el-icon class="el-icon--right"><arrow-down /></el-icon>
+            </el-button>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item v-if="!rollbackNodes.length" disabled>无可回退的已通过环节</el-dropdown-item>
                 <el-dropdown-item v-for="n in rollbackNodes" :key="n.id" :command="n.id">{{ n.nodeName }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -66,6 +69,7 @@
           <el-button type="danger" plain @click="handleTerminate">终止</el-button>
         </el-form-item>
         <p v-if="isAdminProxy" class="proxy-tip">您正以管理员身份处理当前环节待办</p>
+        <p v-if="!canRollback" class="rollback-tip">仅当存在已审批通过且早于当前环节的节点时可回退（例如财务环节须部门审批已通过）</p>
       </el-form>
     </el-card>
 
@@ -133,7 +137,8 @@ let viewer = null
 const instanceStatusText = computed(() => ({ '0': '审批中', '1': '已完成', '2': '已终止' }[instance.value.status] || ''))
 const instanceStatusType = computed(() => ({ '0': 'warning', '1': 'success', '2': 'danger' }[instance.value.status] || 'info'))
 const timelineNodes = computed(() => instance.value.nodes || [])
-const rollbackNodes = computed(() => (instance.value.nodes || []).filter(n => n.approvalType === 'SINGLE' && n.nodeOrder > 1))
+const rollbackNodes = computed(() => instance.value.rollbackTargets || [])
+const canRollback = computed(() => !!instance.value.canRollback)
 const activeNodeOrder = computed(() => {
   const pending = (instance.value.nodes || []).filter(n => n.status === '0' && n.nodeOrder > 1)
   if (!pending.length) return instance.value.activeNodeOrder
@@ -296,7 +301,14 @@ function submitTransfer() {
   })
 }
 function handleRollback(targetNodeId) {
-  rollbackWorkflow(targetNodeId, basePayload()).then(() => { proxy.$modal.msgSuccess('已回退'); refresh() })
+  if (!canRollback.value) {
+    proxy.$modal.msgWarning('当前无可回退的已通过环节')
+    return
+  }
+  const target = rollbackNodes.value.find(n => n.id === targetNodeId)
+  proxy.$modal.confirm(`确认回退到「${target?.nodeName || '目标节点'}」？该环节及之后待办将重新审批。`).then(() => {
+    return rollbackWorkflow(targetNodeId, basePayload())
+  }).then(() => { proxy.$modal.msgSuccess('已回退'); refresh() }).catch(() => {})
 }
 function handleTerminate() {
   proxy.$modal.confirm('确认终止该审批流程？').then(() => {
@@ -340,6 +352,7 @@ onBeforeUnmount(() => { if (viewer) viewer.destroy() })
 .stage-node-item.is-pending { background: #fdf6ec; border: 1px solid #faecd8; }
 .node-name { flex: 1; font-weight: 500; }
 .proxy-tip { margin: 0; font-size: 12px; color: #e6a23c; }
+.rollback-tip { margin: 8px 0 0; font-size: 12px; color: #909399; }
 
 .bpmn-viewport {
   border-radius: 10px;
